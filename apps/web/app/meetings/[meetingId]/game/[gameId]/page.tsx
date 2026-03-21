@@ -173,9 +173,9 @@ export default function PlayPage() {
     );
   });
 
-  // Listen for participant revocation (emitToUser targets us directly)
-  useSocketEvent<{ meeting_id: string }>('participant.revoked', (data) => {
-    if (data.meeting_id === meetingId) {
+  // Listen for participant revocation (broadcast to meeting room)
+  useSocketEvent<{ meeting_id: string; user_id: string }>('participant.revoked', (data) => {
+    if (data.meeting_id === meetingId && data.user_id === user?.id) {
       setKicked(true);
     }
   });

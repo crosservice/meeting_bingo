@@ -56,10 +56,14 @@ export class MembershipsService {
       meeting_id: meetingId,
     });
 
-    // Notify the revoked user in real-time
+    // Broadcast to the meeting room so the kicked user's client sees it.
+    // Using emitToMeeting (room broadcast) instead of emitToUser because
+    // emitToUser requires socket auth userId matching which can fail
+    // when connections go through Nginx. The client checks user_id match.
     try {
-      this.wsGateway.emitToUser(targetUserId, ServerEvents.ParticipantRevoked, {
+      this.wsGateway.emitToMeeting(meetingId, ServerEvents.ParticipantRevoked, {
         meeting_id: meetingId,
+        user_id: targetUserId,
       });
     } catch {
       // WS emit is best-effort
