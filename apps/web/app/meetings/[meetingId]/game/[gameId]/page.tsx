@@ -298,11 +298,14 @@ export default function PlayPage() {
     }
   }
 
-  async function handleKick(targetUserId: string) {
+  async function handleKick(targetUserId: string, nickname: string) {
+    if (!confirm(`Kick ${nickname} from this meeting?`)) return;
     try {
       await api.post(`/meetings/${meetingId}/participants/${targetUserId}/revoke`);
-    } catch {
-      // Kick may fail if already revoked
+      // Remove from local rankings immediately
+      setRankings((prev) => prev.filter((r) => r.user_id !== targetUserId));
+    } catch (err) {
+      alert(`Failed to kick: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   }
 
@@ -539,7 +542,7 @@ export default function PlayPage() {
                         </span>
                         {isOwner && r.user_id !== user?.id && (
                           <button
-                            onClick={() => handleKick(r.user_id)}
+                            onClick={() => handleKick(r.user_id, r.nickname)}
                             className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-[10px] font-medium ml-1"
                             title={`Kick ${r.nickname}`}
                           >
