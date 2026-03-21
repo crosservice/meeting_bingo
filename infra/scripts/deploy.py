@@ -409,50 +409,88 @@ def do_configure_systemd(app_dir):
         step_fail(str(e), "Run: journalctl -u meeting-bingo-api -n 30")
         raise DeploymentFailed()
 
-def do_configure_nginx(app_dir, cfg):
-    step_start("Nginx config")
-    try:
-        src = Path(app_dir) / "infra" / "nginx" / "meeting-bingo.conf"
-        content = src.read_text()
-        content = content.replace("{{DOMAIN}}", cfg["domain"])
-        content = content.replace("{{API_PORT}}", str(cfg["api_port"]))
-        content = content.replace("{{WEB_PORT}}", str(cfg["web_port"]))
+def _write_nginx_config(app_dir, cfg, template_name):
+    """Helper: write an nginx config from a template file, enable the site."""
+    src = Path(app_dir) / "infra" / "nginx" / template_name
+    content = src.read_text()
+    content = content.replace("{{DOMAIN}}", cfg["domain"])
+    content = content.replace("{{API_PORT}}", str(cfg["api_port"]))
+    content = content.replace("{{WEB_PORT}}", str(cfg["web_port"]))
 
-        dst = Path("/etc/nginx/sites-available/meeting-bingo")
-        dst.write_text(content)
-        log(f"Wrote {dst}")
+    dst = Path("/etc/nginx/sites-available/meeting-bingo")
+    dst.write_text(content)
 
-        link = Path("/etc/nginx/sites-enabled/meeting-bingo")
-        if link.is_symlink() or link.exists():
-            link.unlink()
-        link.symlink_to(dst)
+    link = Path("/etc/nginx/sites-enabled/meeting-bingo")
+    if link.is_symlink() or link.exists():
+        link.unlink()
+    link.symlink_to(dst)
 
-        default_link = Path("/etc/nginx/sites-enabled/default")
-        if default_link.exists():
-            default_link.unlink()
-            log("Removed default nginx site")
+    default_link = Path("/etc/nginx/sites-enabled/default")
+    if default_link.exists():
+        default_link.unlink()
 
-        log("Testing nginx config...")
-        run_live("nginx -t")
-        run_quiet("systemctl reload nginx")
-        step_pass(f"Nginx configured for {cfg['domain']}")
-    except Exception as e:
-        step_fail(str(e), "Run: nginx -t  to see config errors")
-        raise DeploymentFailed()
+def do_configure_nginx_and_tls(app_dir, cfg):
+    """
+    Two-stage Nginx setup:
+    1. If TLS cert already exists → write the full HTTPS config directly.
+    2. If no cert yet → write HTTP-only config first, run certbot to obtain cert,
+       then write the full HTTPS config on top.
+    """
+    cert_path = Path(f"/etc/letsencrypt/live/{cfg['domain']}/fullchain.pem")
+    has_cert = cert_path.exists()
 
-def do_obtain_tls(cfg):
-    step_start("TLS certificate")
-    try:
-        cert_path = Path(f"/etc/letsencrypt/live/{cfg['domain']}/fullchain.pem")
-        if cert_path.exists():
-            step_skip("Certificate already exists (certbot auto-renews)")
-            return
-        log(f"Requesting certificate for {cfg['domain']} from Let's Encrypt...")
-        run_live(f"certbot --nginx -d {cfg['domain']} --non-interactive --agree-tos -m {cfg['tls_email']}")
-        step_pass(f"Certificate obtained for {cfg['domain']}")
-    except Exception as e:
-        step_fail(str(e), "Ensure DNS A record points to this server and port 80 is open")
-        raise DeploymentFailed()
+    if has_cert:
+        # Cert exists — go straight to full HTTPS config
+        step_start("Nginx config (HTTPS)")
+        try:
+            log(f"TLS certificate found, writing HTTPS config...")
+            _write_nginx_config(app_dir, cfg, "meeting-bingo.conf")
+            log("Testing nginx config...")
+            run_live("nginx -t")
+            run_quiet("systemctl reload nginx")
+            step_pass(f"Nginx HTTPS configured for {cfg['domain']}")
+        except Exception as e:
+            step_fail(str(e), "Run: nginx -t  to see config errors")
+            raise DeploymentFailed()
+
+        step_start("TLS certificate")
+        step_skip("Certificate already exists (certbot auto-renews)")
+    else:
+        # No cert — deploy HTTP-only first so certbot can validate
+        step_start("Nginx config (HTTP for certbot)")
+        try:
+            log("No TLS certificate yet — deploying HTTP-only config for certbot validation...")
+            _write_nginx_config(app_dir, cfg, "meeting-bingo-initial.conf")
+            log("Testing nginx config...")
+            run_live("nginx -t")
+            run_quiet("systemctl reload nginx")
+            step_pass(f"HTTP config deployed for {cfg['domain']}")
+        except Exception as e:
+            step_fail(str(e), "Run: nginx -t  to see config errors")
+            raise DeploymentFailed()
+
+        # Now obtain cert
+        step_start("TLS certificate")
+        try:
+            log(f"Requesting certificate for {cfg['domain']} from Let's Encrypt...")
+            run_live(f"certbot --nginx -d {cfg['domain']} --non-interactive --agree-tos -m {cfg['tls_email']}")
+            step_pass(f"Certificate obtained for {cfg['domain']}")
+        except Exception as e:
+            step_fail(str(e), "Ensure DNS A record points to this server and port 80 is open")
+            raise DeploymentFailed()
+
+        # Now write the full HTTPS config with hardened settings
+        step_start("Nginx config (HTTPS upgrade)")
+        try:
+            log("Upgrading to full HTTPS config with security headers...")
+            _write_nginx_config(app_dir, cfg, "meeting-bingo.conf")
+            log("Testing nginx config...")
+            run_live("nginx -t")
+            run_quiet("systemctl reload nginx")
+            step_pass(f"Nginx HTTPS configured for {cfg['domain']}")
+        except Exception as e:
+            step_fail(str(e), "Run: nginx -t  to see config errors")
+            raise DeploymentFailed()
 
 def do_configure_firewall():
     step_start("Firewall (UFW)")
@@ -576,8 +614,7 @@ def print_report(cfg, app_dir, aborted=False):
 
     for r in results:
         icon = {"PASS": "\u2713", "SKIP": "\u2013", "FAIL": "\u2717"}[r.status]
-        color = {"PASS": "", "SKIP": "", "FAIL": ""}[r.status]
-        print(f"  {r.status:4s}  {icon}  {r.name:<30s}  {r.message}", flush=True)
+        print(f"  {r.status:4s}  {icon}  {r.name:<35s}  {r.message}", flush=True)
         if r.remediation:
             print(f"              \u2192 Fix: {r.remediation}", flush=True)
 
@@ -684,8 +721,7 @@ Examples:
         do_set_permissions(app_dir)
         do_run_migrations(app_dir, cfg)
         do_configure_systemd(app_dir)
-        do_configure_nginx(app_dir, cfg)
-        do_obtain_tls(cfg)
+        do_configure_nginx_and_tls(app_dir, cfg)
         do_configure_firewall()
         do_hardening()
         do_configure_logrotate()
