@@ -173,10 +173,14 @@ export default function PlayPage() {
     );
   });
 
-  // Listen for participant revocation (broadcast to meeting room)
+  // Listen for participant revocation — immediately redirect
   useSocketEvent<{ meeting_id: string; user_id: string }>('participant.revoked', (data) => {
     if (data.meeting_id === meetingId && data.user_id === user?.id) {
       setKicked(true);
+      // Force navigation after a brief moment so they see the message
+      setTimeout(() => {
+        window.location.href = '/dashboard?kicked=1';
+      }, 3000);
     }
   });
 
@@ -334,12 +338,13 @@ export default function PlayPage() {
         <div className="relative z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm mx-auto p-8 text-center">
           <div className="text-5xl mb-4">👋</div>
           <h1 className="text-2xl font-bold mb-2">lol you got kicked</h1>
-          <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">
+          <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm">
             The meeting owner removed you. Better luck next time!
           </p>
-          <Link href="/dashboard" className="inline-block rounded bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700">
-            Back to Dashboard
-          </Link>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">Redirecting to dashboard in 3 seconds...</p>
+          <a href="/dashboard" className="inline-block rounded bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700">
+            Go Now
+          </a>
         </div>
       </main>
     );

@@ -35,6 +35,12 @@ export default function DashboardPage() {
   const [inviteCode, setInviteCode] = useState('');
   const [inviteError, setInviteError] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [wasKicked, setWasKicked] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('kicked=1')) {
+      setWasKicked(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -94,6 +100,14 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto max-w-4xl">
+        {/* Kicked banner */}
+        {wasKicked && (
+          <div className="mb-6 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-4 text-center">
+            <span className="text-lg mr-2">👋</span>
+            <span className="text-sm text-red-700 dark:text-red-300">You were removed from a meeting by the owner.</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
