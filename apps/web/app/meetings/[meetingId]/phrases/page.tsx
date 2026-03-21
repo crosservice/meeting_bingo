@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import ThemeToggle from '@/components/theme-toggle';
 
 interface PhraseSet { id: string; name: string; }
 interface Phrase { id: string; text: string; normalized_text: string; is_active: boolean; }
@@ -62,7 +63,10 @@ export default function PhrasesPage() {
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto max-w-2xl">
-        <Link href={`/meetings/${meetingId}`} className="text-sm text-blue-600 hover:underline">&larr; Meeting</Link>
+        <div className="flex items-center justify-between">
+          <Link href={`/meetings/${meetingId}`} className="text-sm text-blue-600 hover:underline">&larr; Meeting</Link>
+          <ThemeToggle />
+        </div>
         <h1 className="mt-4 mb-6 text-2xl font-bold">Phrase Pool</h1>
 
         {/* Create new set */}

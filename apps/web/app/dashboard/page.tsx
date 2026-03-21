@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth-context';
 import { api, ApiError } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ThemeToggle from '@/components/theme-toggle';
 import { useEffect, useState, FormEvent } from 'react';
 
 interface MeetingEnriched {
@@ -26,7 +27,7 @@ interface Stats {
 }
 
 export default function DashboardPage() {
-  const { user, loading, logout, theme, setTheme } = useAuth();
+  const { user, loading, logout } = useAuth();
   const router = useRouter();
   const [meetings, setMeetings] = useState<MeetingEnriched[]>([]);
   const [stats, setStats] = useState<Stats>({ games_played: 0, wins: 0, losses: 0 });
@@ -100,14 +101,7 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-600 dark:text-gray-400">Welcome, {user.nickname}</p>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="rounded bg-gray-200 dark:bg-gray-700 px-2 py-2 text-lg leading-none hover:bg-gray-300 dark:hover:bg-gray-600"
-              title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-            >
-              {theme === 'light' ? '☀️' : '🌙'}
-            </button>
+            <ThemeToggle />
             <Link
               href="/meetings/new"
               className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"

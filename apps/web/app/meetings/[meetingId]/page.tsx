@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import ThemeToggle from '@/components/theme-toggle';
 
 interface Meeting {
   id: string;
@@ -118,7 +119,10 @@ export default function MeetingDetailPage() {
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto max-w-5xl">
-        <Link href="/dashboard" className="text-sm text-blue-600 hover:underline">&larr; Dashboard</Link>
+        <div className="flex items-center justify-between">
+          <Link href="/dashboard" className="text-sm text-blue-600 hover:underline">&larr; Dashboard</Link>
+          <ThemeToggle />
+        </div>
 
         <div className="mt-4 mb-6 flex items-start justify-between">
           <div>

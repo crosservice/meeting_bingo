@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
+import ThemeToggle from '@/components/theme-toggle';
 
 interface Invite {
   id: string;
@@ -74,12 +75,15 @@ export default function InvitesPage() {
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto max-w-lg">
-        <Link
-          href={`/meetings/${meetingId}`}
-          className="text-sm text-blue-600 hover:underline"
-        >
-          &larr; Meeting
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link
+            href={`/meetings/${meetingId}`}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            &larr; Meeting
+          </Link>
+          <ThemeToggle />
+        </div>
         <h1 className="mt-4 mb-6 text-2xl font-bold">Invite Links</h1>
 
         {/* Create new invite */}

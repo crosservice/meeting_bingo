@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import ThemeToggle from '@/components/theme-toggle';
 
 export default function JoinPage() {
   const params = useParams();
@@ -63,6 +64,7 @@ export default function JoinPage() {
   if (error && !meetingId) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-8">
+        <div className="fixed top-4 right-4 z-50"><ThemeToggle /></div>
         <div className="w-full max-w-sm text-center">
           <h1 className="text-2xl font-bold mb-4">Invalid Invite</h1>
           <p className="text-gray-600 mb-6">{error}</p>
@@ -77,6 +79,7 @@ export default function JoinPage() {
   if (!user) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-8">
+        <div className="fixed top-4 right-4 z-50"><ThemeToggle /></div>
         <div className="w-full max-w-sm text-center">
           <h1 className="text-2xl font-bold mb-2">Join: {meetingName}</h1>
           <p className="text-gray-600 mb-6">Sign in or create an account to join this meeting.</p>
@@ -101,6 +104,7 @@ export default function JoinPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
+      <div className="fixed top-4 right-4 z-50"><ThemeToggle /></div>
       <div className="w-full max-w-sm text-center">
         <h1 className="text-2xl font-bold mb-2">Join: {meetingName}</h1>
         <p className="text-gray-600 mb-4">

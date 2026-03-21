@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, ApiError } from '@/lib/auth-context';
+import ThemeToggle from '@/components/theme-toggle';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
+      <div className="fixed top-4 right-4 z-50"><ThemeToggle /></div>
       <div className="w-full max-w-sm">
         <h1 className="mb-6 text-2xl font-bold text-center">Sign In</h1>
 

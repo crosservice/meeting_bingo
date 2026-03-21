@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
+import ThemeToggle from '@/components/theme-toggle';
 
 export default function NewMeetingPage() {
   const router = useRouter();
@@ -40,9 +41,12 @@ export default function NewMeetingPage() {
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto max-w-lg">
-        <Link href="/dashboard" className="text-sm text-blue-600 hover:underline">
-          &larr; Dashboard
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/dashboard" className="text-sm text-blue-600 hover:underline">
+            &larr; Dashboard
+          </Link>
+          <ThemeToggle />
+        </div>
         <h1 className="mt-4 mb-6 text-2xl font-bold">Create Meeting</h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">

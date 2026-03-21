@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
+import ThemeToggle from '@/components/theme-toggle';
 
 interface PhraseSet { id: string; name: string; }
 interface Ruleset { id: string; name: string; }
@@ -72,7 +73,10 @@ export default function GameControlPage() {
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto max-w-2xl">
-        <Link href={`/meetings/${meetingId}`} className="text-sm text-blue-600 hover:underline">&larr; Meeting</Link>
+        <div className="flex items-center justify-between">
+          <Link href={`/meetings/${meetingId}`} className="text-sm text-blue-600 hover:underline">&larr; Meeting</Link>
+          <ThemeToggle />
+        </div>
         <h1 className="mt-4 mb-6 text-2xl font-bold">Game Control</h1>
 
         {error && <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}

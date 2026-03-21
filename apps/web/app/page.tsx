@@ -1,8 +1,10 @@
 import Link from 'next/link';
+import ThemeToggle from '@/components/theme-toggle';
 
 export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
+      <div className="fixed top-4 right-4 z-50"><ThemeToggle /></div>
       <h1 className="text-4xl font-bold tracking-tight">Meeting Bingo</h1>
       <p className="mt-4 text-lg text-gray-600">Real-time bingo games for live meetings.</p>
       <div className="mt-8 flex gap-4">

@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth-context';
 import { api, ApiError } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ThemeToggle from '@/components/theme-toggle';
 import { useEffect, useState, FormEvent } from 'react';
 
 export default function AccountPage() {
@@ -109,12 +110,15 @@ export default function AccountPage() {
             <h1 className="text-2xl font-bold">Account Settings</h1>
             <p className="text-sm text-gray-600 dark:text-gray-400">{user.nickname}</p>
           </div>
-          <Link
-            href="/dashboard"
-            className="rounded bg-gray-200 dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
-          >
-            Back to Dashboard
-          </Link>
+          <div className="flex gap-3">
+            <ThemeToggle />
+            <Link
+              href="/dashboard"
+              className="rounded bg-gray-200 dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
         </div>
 
         {/* Change Password */}

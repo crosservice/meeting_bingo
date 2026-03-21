@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useSocket, useSocketEvent } from '@/lib/socket';
+import ThemeToggle from '@/components/theme-toggle';
 
 interface ChatMsg {
   id: string;
@@ -283,6 +284,7 @@ export default function PlayPage() {
           <div className="mb-4 flex items-center justify-between">
             <Link href={`/meetings/${meetingId}/game`} className="text-sm text-blue-600 hover:underline">&larr; Game Control</Link>
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <span className={`w-2 h-2 rounded-full ${
                 socketStatus === 'connected' ? 'bg-green-500' :
                 socketStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' :
