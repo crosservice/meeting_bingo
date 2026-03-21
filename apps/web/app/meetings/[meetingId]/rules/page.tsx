@@ -59,7 +59,7 @@ export default function RulesPage() {
 
         {rulesets.length === 0 ? (
           <div>
-            <p className="mb-4 text-sm text-gray-500">No ruleset yet. Create a default one.</p>
+            <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">No ruleset yet. Create a default one.</p>
             <button onClick={handleCreate}
               className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
               Create Default Ruleset
@@ -68,9 +68,9 @@ export default function RulesPage() {
         ) : (
           <div className="space-y-4">
             {rulesets.map((r) => (
-              <div key={r.id} className="rounded-lg border border-gray-200 p-4">
+              <div key={r.id} className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
                 <h2 className="font-semibold mb-3">{r.name}</h2>
-                <div className="text-sm text-gray-600 mb-3">Board: {r.board_rows}x{r.board_cols} (v1 fixed)</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">Board: {r.board_rows}x{r.board_cols} (v1 fixed)</div>
                 <div className="space-y-2">
                   {[
                     { field: 'free_square_enabled', label: 'Free Square' },

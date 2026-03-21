@@ -127,7 +127,7 @@ export default function MeetingDetailPage() {
         <div className="mt-4 mb-6 flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold">{meeting.name}</h1>
-            <div className="mt-1 flex gap-3 text-sm text-gray-600 flex-wrap">
+            <div className="mt-1 flex gap-3 text-sm text-gray-600 dark:text-gray-400 flex-wrap">
               <span>Status: <strong>{meeting.status}</strong></span>
               <span>Start: {new Date(meeting.scheduled_start_at).toLocaleString()}</span>
               <span>End: {new Date(meeting.scheduled_end_at).toLocaleString()}</span>
@@ -141,7 +141,7 @@ export default function MeetingDetailPage() {
         </div>
 
         {isOwner && (
-          <div className="mb-6 rounded bg-amber-50 p-3 text-xs text-amber-800">
+          <div className="mb-6 rounded bg-amber-50 dark:bg-amber-900/30 p-3 text-xs text-amber-800 dark:text-amber-300">
             You are responsible for any data entered into this meeting, including phrase lists, chat,
             participant access decisions, exports, and downstream AI analysis. Do not use this system
             for confidential, personal, regulated, or restricted information.
@@ -150,19 +150,19 @@ export default function MeetingDetailPage() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Participants */}
-          <section className="rounded-lg border border-gray-200 p-5">
+          <section className="rounded-lg border border-gray-200 dark:border-gray-700 p-5">
             <h2 className="mb-3 text-lg font-semibold">
               Participants ({participants.filter((p) => p.access_status === 'active').length})
             </h2>
             {participants.length === 0 ? (
-              <p className="text-sm text-gray-500">No participants yet.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">No participants yet.</p>
             ) : (
               <ul className="space-y-1.5 max-h-64 overflow-y-auto">
                 {participants.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between rounded border border-gray-100 px-3 py-1.5">
+                  <li key={p.id} className="flex items-center justify-between rounded border border-gray-100 dark:border-gray-700 px-3 py-1.5">
                     <div>
                       <span className="font-medium text-sm">{p.nickname}</span>
-                      <span className="ml-2 text-xs text-gray-500">{p.role}</span>
+                      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{p.role}</span>
                       {p.access_status === 'revoked' && <span className="ml-2 text-xs text-red-500">revoked</span>}
                     </div>
                     {isOwner && p.role !== 'owner' && p.access_status === 'active' && (
@@ -221,9 +221,9 @@ export default function MeetingDetailPage() {
 
           {/* Exports */}
           {isOwner && (
-            <section className="rounded-lg border border-gray-200 p-5">
+            <section className="rounded-lg border border-gray-200 dark:border-gray-700 p-5">
               <h2 className="mb-3 text-lg font-semibold">Exports</h2>
-              <div className="mb-3 rounded bg-amber-50 p-2 text-xs text-amber-700">
+              <div className="mb-3 rounded bg-amber-50 dark:bg-amber-900/30 p-2 text-xs text-amber-700 dark:text-amber-400">
                 Exports may contain participant nicknames, timestamps, chat records, gameplay events,
                 rankings, and winning card data. Handle exports as controlled records.
               </div>
@@ -233,14 +233,14 @@ export default function MeetingDetailPage() {
               {exports.length > 0 && (
                 <ul className="space-y-1.5">
                   {exports.map((exp) => (
-                    <li key={exp.id} className="flex items-center justify-between rounded border border-gray-100 px-3 py-2 text-sm">
+                    <li key={exp.id} className="flex items-center justify-between rounded border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm">
                       <div className="flex items-center gap-2">
                         <span className={`text-xs px-2 py-0.5 rounded ${
-                          exp.status === 'completed' ? 'bg-green-100 text-green-700' :
-                          exp.status === 'failed' ? 'bg-red-100 text-red-700' :
-                          'bg-yellow-100 text-yellow-700'
+                          exp.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                          exp.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
                         }`}>{exp.status}</span>
-                        <span className="text-xs text-gray-500">{new Date(exp.created_at).toLocaleString()}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(exp.created_at).toLocaleString()}</span>
                       </div>
                       <div className="flex gap-2">
                         {['pending', 'processing'].includes(exp.status) && (
@@ -260,22 +260,22 @@ export default function MeetingDetailPage() {
 
           {/* AI Analysis Prompts */}
           {isOwner && prompts.length > 0 && (
-            <section className="rounded-lg border border-gray-200 p-5">
+            <section className="rounded-lg border border-gray-200 dark:border-gray-700 p-5">
               <h2 className="mb-3 text-lg font-semibold">AI Analysis Prompts</h2>
-              <p className="mb-3 text-xs text-gray-500">
+              <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
                 Copy a prompt and paste it into an AI assistant along with your exported meeting data.
               </p>
               <ul className="space-y-2 max-h-96 overflow-y-auto">
                 {prompts.map((p) => (
-                  <li key={p.id} className="rounded border border-gray-100 p-3">
+                  <li key={p.id} className="rounded border border-gray-100 dark:border-gray-700 p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <span className="text-sm font-medium">{p.title}</span>
-                        <p className="mt-1 text-xs text-gray-600 line-clamp-2">{p.prompt}</p>
+                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{p.prompt}</p>
                       </div>
                       <button
                         onClick={() => copyPrompt(p.prompt, p.id)}
-                        className="shrink-0 rounded bg-gray-200 px-2.5 py-1 text-xs hover:bg-gray-300"
+                        className="shrink-0 rounded bg-gray-200 dark:bg-gray-700 dark:text-gray-200 px-2.5 py-1 text-xs hover:bg-gray-300 dark:hover:bg-gray-600"
                       >
                         {copied === p.id ? 'Copied!' : 'Copy'}
                       </button>

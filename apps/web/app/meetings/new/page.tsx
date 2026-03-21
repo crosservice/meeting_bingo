@@ -51,7 +51,7 @@ export default function NewMeetingPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>
+            <div className="rounded bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>
           )}
 
           <div>
@@ -65,7 +65,7 @@ export default function NewMeetingPage() {
               onChange={(e) => setName(e.target.value)}
               required
               autoFocus
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
@@ -79,7 +79,7 @@ export default function NewMeetingPage() {
               value={startAt}
               onChange={(e) => setStartAt(e.target.value)}
               required
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
@@ -93,11 +93,11 @@ export default function NewMeetingPage() {
               value={endAt}
               onChange={(e) => setEndAt(e.target.value)}
               required
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
-          <div className="rounded bg-amber-50 p-3 text-xs text-amber-800">
+          <div className="rounded bg-amber-50 dark:bg-amber-900/30 p-3 text-xs text-amber-800 dark:text-amber-300">
             You are responsible for any data entered into this meeting, including phrase lists,
             chat, participant access decisions, exports, and downstream AI analysis. Do not use
             this system for confidential, personal, regulated, or restricted information.

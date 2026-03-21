@@ -284,22 +284,22 @@ export default function PlayPage() {
                 'bg-red-500'
               }`} title={socketStatus} />
               <span className={`text-sm px-3 py-1 rounded ${
-                game.status === 'active' ? 'bg-green-100 text-green-700' :
-                game.status === 'won' ? 'bg-yellow-100 text-yellow-700' :
-                'bg-gray-100 text-gray-600'
+                game.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                game.status === 'won' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' :
+                'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
               }`}>{game.status}</span>
             </div>
           </div>
 
           {/* Winner announcement */}
           {game.status === 'won' && (
-            <div className={`mb-4 rounded-lg p-4 text-center ${isWinner ? 'bg-yellow-100 border-2 border-yellow-400' : 'bg-blue-50 border border-blue-200'}`}>
+            <div className={`mb-4 rounded-lg p-4 text-center ${isWinner ? 'bg-yellow-100 border-2 border-yellow-400 dark:bg-yellow-900/50 dark:border-yellow-600' : 'bg-blue-50 border border-blue-200 dark:bg-blue-900/30 dark:border-blue-700'}`}>
               <p className="text-xl font-bold">{isWinner ? 'You won!' : `${winnerNickname} wins!`}</p>
             </div>
           )}
 
           {/* Gameplay warning */}
-          <div className="mb-3 rounded bg-gray-50 px-3 py-2 text-xs text-gray-500">
+          <div className="mb-3 rounded bg-gray-50 dark:bg-gray-800 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
             Phrase selections, counts, timestamps, and participation activity are logged for gameplay, ranking, analytics, and export.
           </div>
 
@@ -307,7 +307,7 @@ export default function PlayPage() {
           <div className="grid grid-cols-5 gap-1">
             {grid.map((row, ri) =>
               row.map((cell, ci) => {
-                if (!cell) return <div key={`${ri}-${ci}`} className="aspect-square bg-gray-100 rounded" />;
+                if (!cell) return <div key={`${ri}-${ci}`} className="aspect-square bg-gray-100 dark:bg-gray-700 rounded" />;
 
                 const isMarked = cell.current_count > 0;
                 const isPending = pendingCells.has(cell.id);
@@ -316,9 +316,9 @@ export default function PlayPage() {
                   <div
                     key={cell.id}
                     className={`relative flex flex-col items-center justify-center rounded border-2 p-1 text-center transition-colors
-                      ${cell.is_free_square ? 'bg-purple-100 border-purple-300' :
-                        isMarked ? 'bg-green-100 border-green-400' :
-                        'bg-white border-gray-200 hover:border-gray-300'}
+                      ${cell.is_free_square ? 'bg-purple-100 border-purple-300 dark:bg-purple-900 dark:border-purple-600' :
+                        isMarked ? 'bg-green-100 border-green-400 dark:bg-green-900 dark:border-green-600' :
+                        'bg-white border-gray-200 hover:border-gray-300 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-gray-500'}
                       ${isPending ? 'opacity-70' : ''}
                     `}
                     style={{ aspectRatio: '1' }}
@@ -332,7 +332,7 @@ export default function PlayPage() {
                         <button
                           onClick={() => handleDecrement(cell.id)}
                           disabled={isGameOver || cell.current_count <= 0}
-                          className="w-6 h-6 rounded bg-gray-200 text-xs font-bold hover:bg-gray-300 disabled:opacity-30"
+                          className="w-6 h-6 rounded bg-gray-200 dark:bg-gray-700 dark:text-gray-200 text-xs font-bold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-30"
                         >
                           -
                         </button>
@@ -348,7 +348,7 @@ export default function PlayPage() {
                     )}
 
                     {cell.is_free_square && (
-                      <span className="text-xs text-purple-600 font-semibold">AUTO</span>
+                      <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold">AUTO</span>
                     )}
                   </div>
                 );
@@ -363,20 +363,20 @@ export default function PlayPage() {
           <div>
             <h2 className="mb-2 text-sm font-semibold">Rankings</h2>
             {rankings.length === 0 ? (
-              <p className="text-xs text-gray-500">No rankings yet.</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">No rankings yet.</p>
             ) : (
               <ul className="space-y-1">
                 {rankings.map((r) => (
                   <li
                     key={r.user_id}
                     className={`rounded border px-2 py-1.5 text-xs
-                      ${r.user_id === user?.id ? 'border-blue-300 bg-blue-50' : 'border-gray-100'}
-                      ${r.marks_until_win === 0 ? 'font-bold text-yellow-700' : ''}
+                      ${r.user_id === user?.id ? 'border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/30' : 'border-gray-100 dark:border-gray-700'}
+                      ${r.marks_until_win === 0 ? 'font-bold text-yellow-700 dark:text-yellow-400' : ''}
                     `}
                   >
                     <span className="font-semibold">#{r.rank}</span>{' '}
                     <span>{r.nickname}</span>
-                    <span className="float-right text-gray-500">
+                    <span className="float-right text-gray-500 dark:text-gray-400">
                       {r.marks_until_win === 0 ? 'BINGO!' : `${r.marks_until_win} to go`}
                     </span>
                   </li>
@@ -409,7 +409,7 @@ export default function PlayPage() {
                   Do not post confidential or personal information. Messages are logged and may be exported.
                 </div>
                 {chatError && (
-                  <div className="px-2 py-1 bg-red-50 text-[10px] text-red-600">{chatError}</div>
+                  <div className="px-2 py-1 bg-red-50 dark:bg-red-900/30 text-[10px] text-red-600 dark:text-red-400">{chatError}</div>
                 )}
                 <div className="flex gap-1 p-1.5">
                   <input
@@ -433,7 +433,7 @@ export default function PlayPage() {
             </div>
           ) : (
             <div className="flex items-center justify-center border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-              <p className="text-sm text-gray-500">Chat is disabled for this meeting.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Chat is disabled for this meeting.</p>
             </div>
           )}
         </div>

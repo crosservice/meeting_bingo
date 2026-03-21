@@ -87,9 +87,9 @@ export default function InvitesPage() {
         <h1 className="mt-4 mb-6 text-2xl font-bold">Invite Links</h1>
 
         {/* Create new invite */}
-        <form onSubmit={handleCreate} className="mb-6 space-y-3 rounded border border-gray-200 p-4">
+        <form onSubmit={handleCreate} className="mb-6 space-y-3 rounded border border-gray-200 dark:border-gray-700 p-4">
           <h2 className="text-sm font-semibold">Generate New Invite</h2>
-          {error && <div className="rounded bg-red-50 p-2 text-sm text-red-700">{error}</div>}
+          {error && <div className="rounded bg-red-50 dark:bg-red-900/30 p-2 text-sm text-red-700 dark:text-red-300">{error}</div>}
 
           <div>
             <label htmlFor="expiresAt" className="block text-xs font-medium mb-1">
@@ -101,7 +101,7 @@ export default function InvitesPage() {
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
               required
-              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm"
+              className="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 px-3 py-1.5 text-sm"
             />
           </div>
 
@@ -116,7 +116,7 @@ export default function InvitesPage() {
               value={maxUses}
               onChange={(e) => setMaxUses(e.target.value)}
               placeholder="Unlimited"
-              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm"
+              className="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 px-3 py-1.5 text-sm"
             />
           </div>
 
@@ -130,8 +130,8 @@ export default function InvitesPage() {
 
         {/* Show generated token */}
         {newToken && (
-          <div className="mb-6 rounded bg-green-50 p-4">
-            <p className="text-sm font-medium text-green-800 mb-2">
+          <div className="mb-6 rounded bg-green-50 dark:bg-green-900/30 p-4">
+            <p className="text-sm font-medium text-green-800 dark:text-green-300 mb-2">
               Invite link created! Copy it now — you won&apos;t see the token again.
             </p>
             <div className="flex gap-2">
@@ -139,7 +139,7 @@ export default function InvitesPage() {
                 type="text"
                 readOnly
                 value={getInviteLink(newToken)}
-                className="flex-1 rounded border border-green-300 px-2 py-1 text-xs font-mono bg-white"
+                className="flex-1 rounded border border-green-300 dark:border-green-600 px-2 py-1 text-xs font-mono bg-white dark:bg-gray-800 dark:text-gray-100"
               />
               <button
                 onClick={() => navigator.clipboard.writeText(getInviteLink(newToken))}
@@ -148,7 +148,7 @@ export default function InvitesPage() {
                 Copy
               </button>
             </div>
-            <p className="mt-2 text-xs text-green-700">
+            <p className="mt-2 text-xs text-green-700 dark:text-green-400">
               Access to a meeting is controlled by invite and account authentication. Meeting
               owners can revoke access at any time.
             </p>
@@ -157,18 +157,18 @@ export default function InvitesPage() {
 
         {/* Invite list */}
         {loading ? (
-          <p className="text-sm text-gray-500">Loading...</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
         ) : invites.length === 0 ? (
-          <p className="text-sm text-gray-500">No invites yet.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">No invites yet.</p>
         ) : (
           <ul className="space-y-2">
             {invites.map((inv) => (
-              <li key={inv.id} className="rounded border border-gray-200 p-3">
+              <li key={inv.id} className="rounded border border-gray-200 dark:border-gray-700 p-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm">
-                    <span className="text-gray-500">Uses:</span> {inv.current_uses}
+                    <span className="text-gray-500 dark:text-gray-400">Uses:</span> {inv.current_uses}
                     {inv.max_uses !== null && `/${inv.max_uses}`}
-                    <span className="ml-3 text-gray-500">Expires:</span>{' '}
+                    <span className="ml-3 text-gray-500 dark:text-gray-400">Expires:</span>{' '}
                     {new Date(inv.expires_at).toLocaleString()}
                     {inv.revoked_at && (
                       <span className="ml-2 text-xs text-red-500">Revoked</span>
