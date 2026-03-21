@@ -204,7 +204,7 @@ export default function DashboardPage() {
                   ]);
                   setMeetings(meetingsRes.meetings);
                   setStats(statsRes.stats);
-                } catch {} finally { setFetching(false); }
+                } catch { /* ignore */ } finally { setFetching(false); }
               }}
               className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
             >
