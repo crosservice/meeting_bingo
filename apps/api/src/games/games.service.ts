@@ -266,6 +266,39 @@ export class GamesService {
     return games.map(toGameResponse);
   }
 
+  async getGameResults(gameId: string) {
+    const game = await this.repo.findById(gameId);
+    if (!game) throw new NotFoundException('Game not found');
+
+    const response: {
+      game: ReturnType<typeof toGameResponse>;
+      winner_nickname: string | null;
+      winning_card: ReturnType<typeof toCellResponse>[] | null;
+    } = {
+      game: toGameResponse(game),
+      winner_nickname: null,
+      winning_card: null,
+    };
+
+    if (game.winner_user_id) {
+      // Get winner nickname
+      const { rows } = await this.pool.query(
+        'SELECT nickname FROM users WHERE id = $1',
+        [game.winner_user_id],
+      );
+      response.winner_nickname = rows[0]?.nickname ?? null;
+
+      // Get winning card cells
+      const winnerCard = await this.repo.findCardByGameAndUser(gameId, game.winner_user_id);
+      if (winnerCard) {
+        const cells = await this.repo.findCellsByCard(winnerCard.id);
+        response.winning_card = cells.map(toCellResponse);
+      }
+    }
+
+    return response;
+  }
+
   async findActiveByMeeting(meetingId: string) {
     return this.repo.findActiveByMeeting(meetingId);
   }

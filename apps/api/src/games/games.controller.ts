@@ -69,6 +69,14 @@ export class GamesController {
     return { game };
   }
 
+  @Get('games/:gameId/results')
+  async getResults(
+    @Param('gameId') gameId: string,
+    @CurrentUser() _user: AuthenticatedUser,
+  ) {
+    return this.gamesService.getGameResults(gameId);
+  }
+
   @Get('games/:gameId/cards/me')
   async getMyCard(
     @Param('gameId') gameId: string,

@@ -50,6 +50,9 @@ export default function PlayPage() {
   const { joinMeeting, leaveMeeting, status: socketStatus } = useSocket();
 
   const [chatEnabled, setChatEnabled] = useState(true);
+  const [viewingResults, setViewingResults] = useState(false);
+  const [resultsWinnerNickname, setResultsWinnerNickname] = useState<string | null>(null);
+  const [resultsWinningCard, setResultsWinningCard] = useState<Cell[]>([]);
   const [game, setGame] = useState<GameInfo | null>(null);
   const [cells, setCells] = useState<Cell[]>([]);
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
@@ -77,21 +80,39 @@ export default function PlayPage() {
       try {
         const [gameRes, cardRes, chatRes, meetingRes] = await Promise.all([
           api.get<{ game: GameInfo }>(`/games/${gameId}`),
-          api.get<{ card: { cells: Cell[] } }>(`/games/${gameId}/cards/me`),
+          api.get<{ card: { cells: Cell[] } }>(`/games/${gameId}/cards/me`).catch(() => null),
           api.get<{ messages: ChatMsg[] }>(`/meetings/${meetingId}/chat?limit=50`).catch(() => ({ messages: [] })),
           api.get<{ meeting: { chat_enabled: boolean; owner_user_id: string } }>(`/meetings/${meetingId}`).catch(() => ({ meeting: { chat_enabled: true, owner_user_id: '' } })),
         ]);
         setGame(gameRes.game);
-        setCells(cardRes.card.cells);
         setChatMessages(chatRes.messages);
         setChatEnabled(meetingRes.meeting.chat_enabled);
         setOwnerUserId(meetingRes.meeting.owner_user_id);
-        await fetchRankings();
 
-        if (gameRes.game.winner_user_id) {
-          const winner = await api.get<{ rankings: RankingEntry[] }>(`/games/${gameId}/rankings`)
-            .then((r) => r.rankings.find((e) => e.user_id === gameRes.game.winner_user_id));
-          if (winner) setWinnerNickname(winner.nickname);
+        if (cardRes?.card) {
+          setCells(cardRes.card.cells);
+          await fetchRankings();
+
+          if (gameRes.game.winner_user_id) {
+            const winner = await api.get<{ rankings: RankingEntry[] }>(`/games/${gameId}/rankings`)
+              .then((r) => r.rankings.find((e) => e.user_id === gameRes.game.winner_user_id));
+            if (winner) setWinnerNickname(winner.nickname);
+          }
+        } else {
+          // No card — show results view for finished games
+          setViewingResults(true);
+          try {
+            const results = await api.get<{
+              game: GameInfo;
+              winner_nickname: string | null;
+              winning_card: Cell[] | null;
+            }>(`/games/${gameId}/results`);
+            if (results.winner_nickname) setResultsWinnerNickname(results.winner_nickname);
+            if (results.winning_card) setResultsWinningCard(results.winning_card);
+          } catch {
+            // Results fetch failed
+          }
+          await fetchRankings();
         }
       } catch {
         // Handle error
@@ -299,6 +320,88 @@ export default function PlayPage() {
 
   if (!game) {
     return <main className="flex min-h-screen items-center justify-center"><p className="text-red-600">Game not found</p></main>;
+  }
+
+  // Results view for users who weren't in this game
+  if (viewingResults) {
+    const winGrid: (Cell | null)[][] = Array.from({ length: 5 }, () => Array(5).fill(null));
+    for (const cell of resultsWinningCard) {
+      winGrid[cell.row_index][cell.col_index] = cell;
+    }
+
+    return (
+      <main className="min-h-screen p-8">
+        <div className="mx-auto max-w-2xl">
+          <div className="flex items-center justify-between mb-4">
+            <Link href={`/meetings/${meetingId}`} className="text-sm text-blue-600 hover:underline">&larr; Meeting</Link>
+            <ThemeToggle />
+          </div>
+
+          <div className="text-center mb-6">
+            <span className={`text-sm px-3 py-1 rounded ${
+              game.status === 'won' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' :
+              game.status === 'closed' ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' :
+              'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+            }`}>Game {game.status}</span>
+          </div>
+
+          {resultsWinnerNickname && (
+            <div className="mb-6 rounded-lg bg-yellow-50 dark:bg-yellow-900/30 border-2 border-yellow-400 dark:border-yellow-600 p-6 text-center">
+              <p className="text-2xl font-bold mb-1">Winner: {resultsWinnerNickname}</p>
+            </div>
+          )}
+
+          {resultsWinningCard.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-3 text-center">Winning Card</h2>
+              <div className="grid grid-cols-5 gap-1 max-w-md mx-auto">
+                {winGrid.map((row, ri) =>
+                  row.map((cell, ci) => {
+                    if (!cell) return <div key={`${ri}-${ci}`} className="aspect-square bg-gray-100 dark:bg-gray-700 rounded" />;
+                    const isMarked = cell.current_count > 0;
+                    return (
+                      <div
+                        key={`${ri}-${ci}`}
+                        className={`flex flex-col items-center justify-center rounded border-2 p-1 text-center
+                          ${cell.is_free_square ? 'bg-purple-100 border-purple-300 dark:bg-purple-900 dark:border-purple-600' :
+                            isMarked ? 'bg-green-100 border-green-400 dark:bg-green-900 dark:border-green-600' :
+                            'bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-600'}
+                        `}
+                        style={{ aspectRatio: '1' }}
+                      >
+                        <span className="text-[10px] font-medium leading-tight line-clamp-3">{cell.phrase_text}</span>
+                        {!cell.is_free_square && <span className="text-[10px] text-gray-500">{cell.current_count}</span>}
+                        {cell.is_free_square && <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">FREE</span>}
+                      </div>
+                    );
+                  }),
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Rankings */}
+          {rankings.length > 0 && (
+            <div>
+              <h2 className="text-lg font-semibold mb-3 text-center">Final Rankings</h2>
+              <ul className="space-y-1 max-w-md mx-auto">
+                {rankings.map((r) => (
+                  <li key={r.user_id} className={`rounded border px-3 py-2 text-sm
+                    ${r.marks_until_win === 0 ? 'font-bold text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-600' : 'border-gray-200 dark:border-gray-700'}
+                  `}>
+                    <span className="font-semibold">#{r.rank}</span>{' '}
+                    <span>{r.nickname}</span>
+                    <span className="float-right text-gray-500 dark:text-gray-400">
+                      {r.marks_until_win === 0 ? 'BINGO!' : `${r.marks_until_win} away`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </main>
+    );
   }
 
   // Build 5x5 grid

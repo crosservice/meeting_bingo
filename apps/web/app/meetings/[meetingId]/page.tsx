@@ -184,33 +184,38 @@ export default function MeetingDetailPage() {
             )}
           </section>
 
-          {/* Active Game — visible to ALL participants */}
-          {games.filter((g) => g.status === 'active' || g.status === 'won').length > 0 && (
+          {/* Games — visible to ALL participants */}
+          {games.filter((g) => ['active', 'won', 'closed'].includes(g.status)).length > 0 && (
             <section className="rounded-lg border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 p-5">
-              <h2 className="mb-3 text-lg font-semibold">Active Game</h2>
-              {games
-                .filter((g) => g.status === 'active' || g.status === 'won')
-                .map((g) => (
-                  <div key={g.id} className="flex items-center justify-between">
-                    <div className="text-sm">
-                      <span className={`px-2 py-0.5 rounded text-xs ${
-                        g.status === 'active' ? 'bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-200' :
-                        'bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-200'
-                      }`}>{g.status}</span>
-                      {g.started_at && (
-                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                          Started {new Date(g.started_at).toLocaleTimeString()}
-                        </span>
-                      )}
+              <h2 className="mb-3 text-lg font-semibold">Games</h2>
+              <div className="space-y-2">
+                {games
+                  .filter((g) => ['active', 'won', 'closed'].includes(g.status))
+                  .map((g) => (
+                    <div key={g.id} className="flex items-center justify-between">
+                      <div className="text-sm">
+                        <span className={`px-2 py-0.5 rounded text-xs ${
+                          g.status === 'active' ? 'bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-200' :
+                          g.status === 'won' ? 'bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-200' :
+                          'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                        }`}>{g.status}</span>
+                        {g.started_at && (
+                          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(g.started_at).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      <Link
+                        href={`/meetings/${meetingId}/game/${g.id}`}
+                        className={`rounded px-4 py-2 text-sm font-medium text-white ${
+                          g.status === 'active' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                      >
+                        {g.status === 'active' ? 'Play Bingo' : 'View Results'}
+                      </Link>
                     </div>
-                    <Link
-                      href={`/meetings/${meetingId}/game/${g.id}`}
-                      className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                    >
-                      Play Bingo
-                    </Link>
-                  </div>
-                ))}
+                  ))}
+              </div>
             </section>
           )}
 
