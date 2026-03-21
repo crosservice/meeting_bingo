@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Res,
   Req,
@@ -12,6 +13,7 @@ import {
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
+import { UsersService } from '../users';
 import { CurrentUser, Public, AuthenticatedUser } from './auth.decorators';
 import { registerSchema, loginSchema } from '@meeting-bingo/validation';
 
@@ -24,7 +26,10 @@ const COOKIE_OPTIONS = {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -104,7 +109,25 @@ export class AuthController {
   @Get('me')
   @SkipThrottle()
   async me(@CurrentUser() user: AuthenticatedUser) {
-    return { user };
+    // Return full user from DB (includes theme preference)
+    const fullUser = await this.usersService.findById(user.id);
+    return { user: fullUser ?? user };
+  }
+
+  @Patch('me')
+  @SkipThrottle()
+  async updateMe(
+    @Body() body: { theme?: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (body.theme) {
+      if (!['light', 'dark'].includes(body.theme)) {
+        throw new BadRequestException('Theme must be "light" or "dark"');
+      }
+      await this.usersService.updateTheme(user.id, body.theme);
+    }
+    const fullUser = await this.usersService.findById(user.id);
+    return { user: fullUser };
   }
 
   private setTokenCookies(

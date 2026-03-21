@@ -5,6 +5,7 @@ export interface PublicUser {
   id: string;
   nickname: string;
   status: string;
+  theme: string;
   created_at: string;
   last_login_at: string | null;
 }
@@ -14,6 +15,7 @@ function toPublicUser(row: UserRow): PublicUser {
     id: row.id,
     nickname: row.nickname,
     status: row.status,
+    theme: row.theme || 'light',
     created_at: row.created_at.toISOString(),
     last_login_at: row.last_login_at?.toISOString() ?? null,
   };
@@ -39,5 +41,9 @@ export class UsersService {
 
   async updateLastLogin(id: string): Promise<void> {
     await this.repo.updateLastLogin(id);
+  }
+
+  async updateTheme(id: string, theme: string): Promise<void> {
+    await this.repo.updateTheme(id, theme);
   }
 }

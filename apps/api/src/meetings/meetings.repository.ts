@@ -11,6 +11,8 @@ export interface MeetingRow {
   actual_start_at: Date | null;
   actual_end_at: Date | null;
   grace_minutes: number;
+  chat_enabled: boolean;
+  anonymize_nicknames: boolean;
   status: string;
   created_at: Date;
   updated_at: Date;

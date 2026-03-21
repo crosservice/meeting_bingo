@@ -20,6 +20,8 @@ function toMeetingResponse(row: MeetingRow) {
     actual_start_at: row.actual_start_at?.toISOString() ?? null,
     actual_end_at: row.actual_end_at?.toISOString() ?? null,
     grace_minutes: row.grace_minutes,
+    chat_enabled: row.chat_enabled,
+    anonymize_nicknames: row.anonymize_nicknames,
     status: row.status,
     created_at: row.created_at.toISOString(),
     updated_at: row.updated_at.toISOString(),
@@ -81,7 +83,7 @@ export class MeetingsService {
   async update(
     meetingId: string,
     userId: string,
-    data: { name?: string; scheduled_start_at?: string; scheduled_end_at?: string; grace_minutes?: number },
+    data: { name?: string; scheduled_start_at?: string; scheduled_end_at?: string; grace_minutes?: number; chat_enabled?: boolean; anonymize_nicknames?: boolean },
   ) {
     await this.assertOwner(meetingId, userId);
 
@@ -90,6 +92,8 @@ export class MeetingsService {
     if (data.scheduled_start_at !== undefined) fields.scheduled_start_at = data.scheduled_start_at;
     if (data.scheduled_end_at !== undefined) fields.scheduled_end_at = data.scheduled_end_at;
     if (data.grace_minutes !== undefined) fields.grace_minutes = data.grace_minutes;
+    if (data.chat_enabled !== undefined) fields.chat_enabled = data.chat_enabled;
+    if (data.anonymize_nicknames !== undefined) fields.anonymize_nicknames = data.anonymize_nicknames;
 
     const meeting = await this.repo.update(meetingId, fields);
     if (!meeting) throw new NotFoundException('Meeting not found');

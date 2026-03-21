@@ -7,6 +7,7 @@ export interface UserRow {
   nickname: string;
   password_hash: string;
   status: string;
+  theme: string;
   created_at: Date;
   updated_at: Date;
   last_login_at: Date | null;
@@ -47,6 +48,13 @@ export class UsersRepository {
     await this.pool.query(
       'UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1',
       [id],
+    );
+  }
+
+  async updateTheme(id: string, theme: string): Promise<void> {
+    await this.pool.query(
+      'UPDATE users SET theme = $2, updated_at = NOW() WHERE id = $1',
+      [id, theme],
     );
   }
 }

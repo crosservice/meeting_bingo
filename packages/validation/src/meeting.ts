@@ -12,6 +12,8 @@ export const updateMeetingSchema = z.object({
   scheduled_start_at: z.string().datetime().optional(),
   scheduled_end_at: z.string().datetime().optional(),
   grace_minutes: z.number().int().min(0).max(60).optional(),
+  chat_enabled: z.boolean().optional(),
+  anonymize_nicknames: z.boolean().optional(),
 });
 
 export const createInviteSchema = z.object({

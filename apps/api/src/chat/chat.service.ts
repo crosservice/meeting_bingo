@@ -10,19 +10,20 @@ import { MembershipsService } from '../memberships';
 import { WsGateway } from '../websocket';
 import { ServerEvents } from '@meeting-bingo/types';
 import { CHAT_RATE_LIMIT_MAX, CHAT_RATE_LIMIT_WINDOW_SECONDS } from '@meeting-bingo/config';
+import { anonymizeNickname } from '../common/anonymize';
 
 // Basic profanity word list for spam filtering
 const SPAM_PATTERNS = [
   /(.)\1{5,}/i, // repeated characters
 ];
 
-function toMessageResponse(row: ChatMessageRow) {
+function toMessageResponse(row: ChatMessageRow, anonNickname?: string) {
   return {
     id: row.id,
     meeting_id: row.meeting_id,
     game_id: row.game_id,
     user_id: row.user_id,
-    nickname: row.nickname_snapshot,
+    nickname: anonNickname ?? row.nickname_snapshot,
     message_text: row.moderation_status === 'hidden' ? '[message hidden]' : row.message_text,
     moderation_status: row.moderation_status,
     created_at: row.created_at.toISOString(),
@@ -44,8 +45,12 @@ export class ChatService {
 
   async getMessages(meetingId: string, userId: string, limit?: number, before?: string) {
     await this.membershipsService.assertActiveMember(meetingId, userId);
+    const meeting = await this.meetingsService.assertExists(meetingId);
+    const shouldAnon = meeting.anonymize_nicknames && meeting.owner_user_id !== userId;
     const messages = await this.repo.findByMeeting(meetingId, limit, before);
-    return messages.map(toMessageResponse);
+    return messages.map((m) =>
+      toMessageResponse(m, shouldAnon ? anonymizeNickname(meetingId, m.user_id) : undefined),
+    );
   }
 
   async sendMessage(
@@ -56,6 +61,12 @@ export class ChatService {
     gameId?: string | null,
   ) {
     await this.membershipsService.assertActiveMember(meetingId, userId);
+
+    // Check if chat is enabled for this meeting
+    const meeting = await this.meetingsService.assertExists(meetingId);
+    if (!meeting.chat_enabled) {
+      throw new ForbiddenException('Chat is disabled for this meeting');
+    }
 
     // Rate limit check
     this.enforceRateLimit(userId, meetingId);
@@ -75,10 +86,18 @@ export class ChatService {
     }
 
     const message = await this.repo.create(meetingId, gameId ?? null, userId, nickname, trimmed);
-    const response = toMessageResponse(message);
 
-    // Broadcast to meeting room
-    this.wsGateway.emitToMeeting(meetingId, ServerEvents.ChatCreated, response);
+    // Broadcast to meeting room (anonymized if enabled)
+    if (meeting.anonymize_nicknames) {
+      const anonResponse = toMessageResponse(message, anonymizeNickname(meetingId, userId));
+      this.wsGateway.emitToMeeting(meetingId, ServerEvents.ChatCreated, anonResponse);
+      // Owner gets real nickname
+      this.wsGateway.emitToUser(meeting.owner_user_id, ServerEvents.ChatCreated, toMessageResponse(message));
+    } else {
+      this.wsGateway.emitToMeeting(meetingId, ServerEvents.ChatCreated, toMessageResponse(message));
+    }
+
+    const response = toMessageResponse(message);
 
     return response;
   }

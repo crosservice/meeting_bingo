@@ -7,6 +7,7 @@ import {
 import { Pool, PoolClient } from 'pg';
 import { DATABASE_POOL } from '../database';
 import { AuditService } from '../common';
+import { anonymizeNickname } from '../common/anonymize';
 import { WsGateway } from '../websocket';
 import { ServerEvents } from '@meeting-bingo/types';
 import { BOARD_ROWS, BOARD_COLS, FREE_SQUARE_ROW, FREE_SQUARE_COL } from '@meeting-bingo/config';
@@ -298,10 +299,10 @@ export class GameplayService {
    * Ranking = minimum number of additional first-marks needed to complete any win pattern.
    * Tie-break: earlier timestamp of the last mark event that established current distance.
    */
-  async computeRankings(gameId: string): Promise<RankingEntry[]> {
+  async computeRankings(gameId: string, requestingUserId?: string): Promise<RankingEntry[]> {
     // Get game and ruleset
     const { rows: gameRows } = await this.pool.query(
-      'SELECT ruleset_snapshot_json FROM games WHERE id = $1',
+      'SELECT meeting_id, ruleset_snapshot_json FROM games WHERE id = $1',
       [gameId],
     );
     if (gameRows.length === 0) throw new NotFoundException('Game not found');
@@ -367,6 +368,20 @@ export class GameplayService {
       if (b.last_relevant_mark_at) return 1;
       return 0;
     });
+
+    // Anonymize nicknames if meeting setting is enabled and requester is not the owner
+    if (requestingUserId) {
+      const meetingId = gameRows[0].meeting_id;
+      const { rows: meetingRows } = await this.pool.query(
+        'SELECT owner_user_id, anonymize_nicknames FROM meetings WHERE id = $1',
+        [meetingId],
+      );
+      if (meetingRows.length > 0 && meetingRows[0].anonymize_nicknames && meetingRows[0].owner_user_id !== requestingUserId) {
+        for (const r of rankings) {
+          r.nickname = anonymizeNickname(meetingId, r.user_id);
+        }
+      }
+    }
 
     return rankings;
   }

@@ -14,6 +14,8 @@ interface Meeting {
   scheduled_start_at: string;
   scheduled_end_at: string;
   grace_minutes: number;
+  chat_enabled: boolean;
+  anonymize_nicknames: boolean;
 }
 
 interface Participant {
@@ -170,19 +172,45 @@ export default function MeetingDetailPage() {
 
           {/* Owner controls */}
           {isOwner && (
-            <section className="rounded-lg border border-gray-200 p-5">
+            <section className="rounded-lg border border-gray-200 dark:border-gray-700 p-5">
               <h2 className="mb-3 text-lg font-semibold">Meeting Controls</h2>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {[
                   { href: `/meetings/${meetingId}/invites`, label: 'Manage Invites' },
                   { href: `/meetings/${meetingId}/phrases`, label: 'Phrase Pool' },
                   { href: `/meetings/${meetingId}/rules`, label: 'Game Rules' },
                   { href: `/meetings/${meetingId}/game`, label: 'Game Control' },
                 ].map((item) => (
-                  <Link key={item.href} href={item.href} className="block rounded border border-gray-100 p-3 text-sm hover:bg-gray-50">
+                  <Link key={item.href} href={item.href} className="block rounded border border-gray-100 dark:border-gray-700 p-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
                     {item.label}
                   </Link>
                 ))}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-2">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={meeting.chat_enabled}
+                      onChange={async () => {
+                        const res = await api.patch<{ meeting: Meeting }>(`/meetings/${meetingId}`, { chat_enabled: !meeting.chat_enabled });
+                        setMeeting(res.meeting);
+                      }}
+                      className="rounded"
+                    />
+                    Enable Chat
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={meeting.anonymize_nicknames}
+                      onChange={async () => {
+                        const res = await api.patch<{ meeting: Meeting }>(`/meetings/${meetingId}`, { anonymize_nicknames: !meeting.anonymize_nicknames });
+                        setMeeting(res.meeting);
+                      }}
+                      className="rounded"
+                    />
+                    Anonymize Nicknames
+                  </label>
+                </div>
               </div>
             </section>
           )}

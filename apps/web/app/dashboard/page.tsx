@@ -15,7 +15,7 @@ interface Meeting {
 }
 
 export default function DashboardPage() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, theme, setTheme } = useAuth();
   const router = useRouter();
   const [inProgressMeetings, setInProgressMeetings] = useState<Meeting[]>([]);
   const [fetching, setFetching] = useState(true);
@@ -53,6 +53,13 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-600">Welcome, {user.nickname}</p>
           </div>
           <div className="flex gap-3">
+            <button
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+              className="rounded bg-gray-200 dark:bg-gray-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
+              title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+            >
+              {theme === 'light' ? 'Dark' : 'Light'}
+            </button>
             <Link
               href="/meetings/new"
               className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -61,7 +68,7 @@ export default function DashboardPage() {
             </Link>
             <button
               onClick={logout}
-              className="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+              className="rounded bg-gray-200 dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
             >
               Sign Out
             </button>

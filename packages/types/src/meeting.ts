@@ -17,6 +17,8 @@ export interface Meeting {
   actual_start_at: string | null;
   actual_end_at: string | null;
   grace_minutes: number;
+  chat_enabled: boolean;
+  anonymize_nicknames: boolean;
   status: MeetingStatus;
   created_at: string;
   updated_at: string;

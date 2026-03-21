@@ -79,9 +79,9 @@ export class GameplayController {
   @Get('games/:gameId/rankings')
   async rankings(
     @Param('gameId') gameId: string,
-    @CurrentUser() _user: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const rankings = await this.gameplayService.computeRankings(gameId);
+    const rankings = await this.gameplayService.computeRankings(gameId, user.id);
     return {
       rankings: rankings.map((r, i) => ({
         rank: i + 1,

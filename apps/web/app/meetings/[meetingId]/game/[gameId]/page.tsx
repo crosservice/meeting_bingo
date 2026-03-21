@@ -48,6 +48,7 @@ export default function PlayPage() {
   const { user } = useAuth();
   const { joinMeeting, leaveMeeting, status: socketStatus } = useSocket();
 
+  const [chatEnabled, setChatEnabled] = useState(true);
   const [game, setGame] = useState<GameInfo | null>(null);
   const [cells, setCells] = useState<Cell[]>([]);
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
@@ -71,14 +72,16 @@ export default function PlayPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [gameRes, cardRes, chatRes] = await Promise.all([
+        const [gameRes, cardRes, chatRes, meetingRes] = await Promise.all([
           api.get<{ game: GameInfo }>(`/games/${gameId}`),
           api.get<{ card: { cells: Cell[] } }>(`/games/${gameId}/cards/me`),
           api.get<{ messages: ChatMsg[] }>(`/meetings/${meetingId}/chat?limit=50`).catch(() => ({ messages: [] })),
+          api.get<{ meeting: { chat_enabled: boolean } }>(`/meetings/${meetingId}`).catch(() => ({ meeting: { chat_enabled: true } })),
         ]);
         setGame(gameRes.game);
         setCells(cardRes.card.cells);
         setChatMessages(chatRes.messages);
+        setChatEnabled(meetingRes.meeting.chat_enabled);
         await fetchRankings();
 
         if (gameRes.game.winner_user_id) {
@@ -388,50 +391,56 @@ export default function PlayPage() {
           </div>
 
           {/* Chat */}
-          <div className="flex flex-col border border-gray-200 rounded-lg overflow-hidden" style={{ height: '350px' }}>
-            <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
-              <h2 className="text-sm font-semibold">Chat</h2>
-            </div>
+          {chatEnabled ? (
+            <div className="flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden" style={{ height: '350px' }}>
+              <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-sm font-semibold">Chat</h2>
+              </div>
 
-            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 text-xs">
-              {chatMessages.map((msg) => (
-                <div key={msg.id} className={msg.moderation_status === 'hidden' ? 'opacity-50' : ''}>
-                  <span className="font-semibold">{msg.nickname}: </span>
-                  <span>{msg.message_text}</span>
+              <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 text-xs">
+                {chatMessages.map((msg) => (
+                  <div key={msg.id} className={msg.moderation_status === 'hidden' ? 'opacity-50' : ''}>
+                    <span className="font-semibold">{msg.nickname}: </span>
+                    <span>{msg.message_text}</span>
+                  </div>
+                ))}
+                {chatMessages.length === 0 && (
+                  <p className="text-gray-400 text-center py-4">No messages yet</p>
+                )}
+              </div>
+
+              <div className="border-t border-gray-200 dark:border-gray-700">
+                <div className="px-2 py-1 bg-amber-50 dark:bg-amber-900/30 text-[10px] text-amber-700 dark:text-amber-400">
+                  Do not post confidential or personal information. Messages are logged and may be exported.
                 </div>
-              ))}
-              {chatMessages.length === 0 && (
-                <p className="text-gray-400 text-center py-4">No messages yet</p>
-              )}
-            </div>
-
-            <div className="border-t border-gray-200">
-              <div className="px-2 py-1 bg-amber-50 text-[10px] text-amber-700">
-                Do not post confidential or personal information. Messages are logged and may be exported.
-              </div>
-              {chatError && (
-                <div className="px-2 py-1 bg-red-50 text-[10px] text-red-600">{chatError}</div>
-              )}
-              <div className="flex gap-1 p-1.5">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleSendChat(); }}
-                  placeholder="Type a message..."
-                  maxLength={1000}
-                  className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                />
-                <button
-                  onClick={handleSendChat}
-                  disabled={chatSending || !chatInput.trim()}
-                  className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  Send
-                </button>
+                {chatError && (
+                  <div className="px-2 py-1 bg-red-50 text-[10px] text-red-600">{chatError}</div>
+                )}
+                <div className="flex gap-1 p-1.5">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSendChat(); }}
+                    placeholder="Type a message..."
+                    maxLength={1000}
+                    className="flex-1 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-800 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleSendChat}
+                    disabled={chatSending || !chatInput.trim()}
+                    className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Send
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-center border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+              <p className="text-sm text-gray-500">Chat is disabled for this meeting.</p>
+            </div>
+          )}
         </div>
       </div>
     </main>
