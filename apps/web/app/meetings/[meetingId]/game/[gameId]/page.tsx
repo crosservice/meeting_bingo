@@ -64,6 +64,7 @@ export default function PlayPage() {
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState('');
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<{ user_id: string; nickname: string; role: string; access_status: string }[]>([]);
   const [kicked, setKicked] = useState(false);
 
   const fetchRankings = useCallback(async () => {
@@ -78,16 +79,18 @@ export default function PlayPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [gameRes, cardRes, chatRes, meetingRes] = await Promise.all([
+        const [gameRes, cardRes, chatRes, meetingRes, participantsRes] = await Promise.all([
           api.get<{ game: GameInfo }>(`/games/${gameId}`),
           api.get<{ card: { cells: Cell[] } }>(`/games/${gameId}/cards/me`).catch(() => null),
           api.get<{ messages: ChatMsg[] }>(`/meetings/${meetingId}/chat?limit=50`).catch(() => ({ messages: [] })),
           api.get<{ meeting: { chat_enabled: boolean; owner_user_id: string } }>(`/meetings/${meetingId}`).catch(() => ({ meeting: { chat_enabled: true, owner_user_id: '' } })),
+          api.get<{ participants: { user_id: string; nickname: string; role: string; access_status: string }[] }>(`/meetings/${meetingId}/participants`).catch(() => ({ participants: [] })),
         ]);
         setGame(gameRes.game);
         setChatMessages(chatRes.messages);
         setChatEnabled(meetingRes.meeting.chat_enabled);
         setOwnerUserId(meetingRes.meeting.owner_user_id);
+        setParticipants(participantsRes.participants);
 
         if (cardRes?.card) {
           setCells(cardRes.card.cells);
@@ -302,10 +305,23 @@ export default function PlayPage() {
     if (!confirm(`Kick ${nickname} from this meeting?`)) return;
     try {
       await api.post(`/meetings/${meetingId}/participants/${targetUserId}/revoke`);
-      // Remove from local rankings immediately
       setRankings((prev) => prev.filter((r) => r.user_id !== targetUserId));
+      setParticipants((prev) =>
+        prev.map((p) => (p.user_id === targetUserId ? { ...p, access_status: 'revoked' } : p)),
+      );
     } catch (err) {
       alert(`Failed to kick: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }
+
+  async function handleRestore(targetUserId: string) {
+    try {
+      await api.post(`/meetings/${meetingId}/participants/${targetUserId}/unrevoke`);
+      setParticipants((prev) =>
+        prev.map((p) => (p.user_id === targetUserId ? { ...p, access_status: 'active' } : p)),
+      );
+    } catch (err) {
+      alert(`Failed to restore: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   }
 
@@ -516,46 +532,86 @@ export default function PlayPage() {
 
         {/* Sidebar: Rankings + Chat */}
         <div className="w-72 shrink-0 flex flex-col gap-4">
-          {/* Rankings */}
+          {/* Rankings (filtered: exclude revoked) */}
           <div>
             <h2 className="mb-2 text-sm font-semibold">Rankings</h2>
-            {rankings.length === 0 ? (
-              <p className="text-xs text-gray-500 dark:text-gray-400">No rankings yet.</p>
-            ) : (
-              <ul className="space-y-1">
-                {rankings.map((r) => (
-                  <li
-                    key={r.user_id}
-                    className={`rounded border px-2 py-1.5 text-xs
-                      ${r.user_id === user?.id ? 'border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/30' : 'border-gray-100 dark:border-gray-700'}
-                      ${r.marks_until_win === 0 ? 'font-bold text-yellow-700 dark:text-yellow-400' : ''}
-                    `}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-semibold">#{r.rank}</span>{' '}
-                        <span>{r.nickname}</span>
+            {(() => {
+              const revokedIds = new Set(participants.filter((p) => p.access_status === 'revoked').map((p) => p.user_id));
+              const activeRankings = rankings.filter((r) => !revokedIds.has(r.user_id));
+              return activeRankings.length === 0 ? (
+                <p className="text-xs text-gray-500 dark:text-gray-400">No rankings yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {activeRankings.map((r, i) => (
+                    <li
+                      key={r.user_id}
+                      className={`rounded border px-2 py-1.5 text-xs
+                        ${r.user_id === user?.id ? 'border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/30' : 'border-gray-100 dark:border-gray-700'}
+                        ${r.marks_until_win === 0 ? 'font-bold text-yellow-700 dark:text-yellow-400' : ''}
+                      `}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold">#{i + 1}</span>{' '}
+                          <span>{r.nickname}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {r.marks_until_win === 0 ? 'BINGO!' : `${r.marks_until_win} to go`}
+                          </span>
+                          {isOwner && r.user_id !== user?.id && (
+                            <button
+                              onClick={() => handleKick(r.user_id, r.nickname)}
+                              className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-[10px] font-medium ml-1"
+                              title={`Kick ${r.nickname}`}
+                            >
+                              Kick
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-gray-500 dark:text-gray-400">
-                          {r.marks_until_win === 0 ? 'BINGO!' : `${r.marks_until_win} to go`}
-                        </span>
-                        {isOwner && r.user_id !== user?.id && (
-                          <button
-                            onClick={() => handleKick(r.user_id, r.nickname)}
-                            className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-[10px] font-medium ml-1"
-                            title={`Kick ${r.nickname}`}
-                          >
-                            Kick
-                          </button>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </div>
+
+          {/* Participants panel (owner only) */}
+          {isOwner && participants.length > 0 && (
+            <div>
+              <h2 className="mb-2 text-sm font-semibold">Participants</h2>
+              <ul className="space-y-1 max-h-40 overflow-y-auto">
+                {participants
+                  .filter((p) => p.role !== 'owner')
+                  .map((p) => (
+                    <li key={p.user_id} className="flex items-center justify-between rounded border border-gray-100 dark:border-gray-700 px-2 py-1 text-xs">
+                      <div>
+                        <span className="font-medium">{p.nickname}</span>
+                        {p.access_status === 'revoked' && (
+                          <span className="ml-1 text-red-500 text-[10px]">kicked</span>
                         )}
                       </div>
-                    </div>
-                  </li>
-                ))}
+                      {p.access_status === 'active' ? (
+                        <button
+                          onClick={() => handleKick(p.user_id, p.nickname)}
+                          className="text-red-500 hover:text-red-700 dark:text-red-400 text-[10px] font-medium"
+                        >
+                          Kick
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleRestore(p.user_id)}
+                          className="text-green-600 hover:text-green-700 dark:text-green-400 text-[10px] font-medium"
+                        >
+                          Restore
+                        </button>
+                      )}
+                    </li>
+                  ))}
               </ul>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Chat */}
           {chatEnabled ? (
