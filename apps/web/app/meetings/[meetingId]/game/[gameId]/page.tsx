@@ -321,6 +321,7 @@ export default function PlayPage() {
       setParticipants((prev) =>
         prev.map((p) => (p.user_id === targetUserId ? { ...p, access_status: 'active' } : p)),
       );
+      await fetchRankings();
     } catch (err) {
       alert(`Failed to restore: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
