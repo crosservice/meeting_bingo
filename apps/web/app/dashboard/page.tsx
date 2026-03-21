@@ -39,6 +39,8 @@ export default function DashboardPage() {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.search.includes('kicked=1')) {
       setWasKicked(true);
+      // Remove ?kicked=1 from URL so it doesn't persist on refresh
+      window.history.replaceState({}, '', '/dashboard');
     }
   }, []);
 
