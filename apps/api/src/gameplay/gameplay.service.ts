@@ -148,13 +148,8 @@ export class GameplayService {
       const cells = await this.getCellsForCard(cardId);
       const updatedCell = this.findCell(cells, cellId);
 
-      // Emit real-time events
-      this.wsGateway.emitToUser(userId, ServerEvents.CardUpdated, {
-        game_id: gameId,
-        cell: updatedCell,
-      });
-
-      // Broadcast ranking update to all meeting participants
+      // Card update is returned in the REST response — no WS emit needed
+      // for the acting user. Broadcast ranking update to all participants.
       try {
         const rankings = await this.computeRankings(gameId);
         this.wsGateway.emitToMeeting(meetingId, ServerEvents.RankingUpdated, {

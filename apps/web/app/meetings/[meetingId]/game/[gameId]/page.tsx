@@ -112,14 +112,7 @@ export default function PlayPage() {
     }
   });
 
-  // Listen for real-time card updates (from other tabs/devices)
-  useSocketEvent<{ game_id: string; cell: Cell }>('card.updated', (data) => {
-    if (data.game_id === gameId && data.cell) {
-      setCells((prev) =>
-        prev.map((c) => (c.id === data.cell.id ? { ...c, current_count: data.cell.current_count } : c)),
-      );
-    }
-  });
+
 
   // Listen for game won event
   useSocketEvent<{ game_id: string; winner_user_id: string }>('game.won', (data) => {
