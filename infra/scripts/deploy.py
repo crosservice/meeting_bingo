@@ -351,7 +351,10 @@ def do_build_app(app_dir):
     step_start("App build (pnpm build)")
     try:
         log("Building shared packages, NestJS API, and Next.js frontend...")
-        run_live(f"cd {app_dir} && pnpm run build")
+        # Source .env so NEXT_PUBLIC_* vars are available at build time.
+        # Next.js inlines NEXT_PUBLIC_* into the client bundle during build,
+        # so these must be in the process environment, not just in .env files.
+        run_live(f"cd {app_dir} && set -a && . .env && set +a && pnpm run build")
         step_pass("Frontend and backend built")
     except Exception as e:
         step_fail(str(e), "Check build output above for TypeScript errors")
