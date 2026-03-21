@@ -80,6 +80,14 @@ export class MeetingsService {
     return meetings.map(toMeetingResponse);
   }
 
+  async findAllForUserEnriched(userId: string) {
+    return this.repo.findAllForUserEnriched(userId);
+  }
+
+  async getUserGameStats(userId: string) {
+    return this.repo.getUserGameStats(userId);
+  }
+
   async update(
     meetingId: string,
     userId: string,

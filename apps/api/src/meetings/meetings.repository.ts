@@ -73,6 +73,45 @@ export class MeetingsRepository {
     return rows;
   }
 
+  async findAllForUserEnriched(userId: string) {
+    // All meetings user is a member of, with owner nickname and latest game winner
+    const { rows } = await this.pool.query(
+      `SELECT m.*,
+              owner.nickname AS owner_nickname,
+              mm.role AS user_role,
+              (SELECT count(*) FROM games g WHERE g.meeting_id = m.id AND g.status IN ('won', 'closed')) AS game_count,
+              (SELECT g.winner_user_id FROM games g WHERE g.meeting_id = m.id AND g.status = 'won' ORDER BY g.ended_at DESC LIMIT 1) AS last_winner_user_id,
+              (SELECT u2.nickname FROM games g JOIN users u2 ON u2.id = g.winner_user_id WHERE g.meeting_id = m.id AND g.status = 'won' ORDER BY g.ended_at DESC LIMIT 1) AS last_winner_nickname
+       FROM meetings m
+       JOIN meeting_memberships mm ON mm.meeting_id = m.id AND mm.user_id = $1 AND mm.deleted_at IS NULL
+       JOIN users owner ON owner.id = m.owner_user_id
+       WHERE m.deleted_at IS NULL
+       ORDER BY
+         CASE WHEN m.status IN ('open', 'in_progress') THEN 0 ELSE 1 END,
+         m.scheduled_start_at DESC`,
+      [userId],
+    );
+    return rows;
+  }
+
+  async getUserGameStats(userId: string) {
+    const { rows } = await this.pool.query(
+      `SELECT
+         count(DISTINCT gc.game_id) AS games_played,
+         count(DISTINCT gc.game_id) FILTER (WHERE g.winner_user_id = $1) AS wins,
+         count(DISTINCT gc.game_id) FILTER (WHERE g.status IN ('won', 'closed') AND (g.winner_user_id IS NULL OR g.winner_user_id != $1)) AS losses
+       FROM game_cards gc
+       JOIN games g ON g.id = gc.game_id
+       WHERE gc.user_id = $1 AND g.status IN ('won', 'closed')`,
+      [userId],
+    );
+    return {
+      games_played: parseInt(rows[0]?.games_played || '0', 10),
+      wins: parseInt(rows[0]?.wins || '0', 10),
+      losses: parseInt(rows[0]?.losses || '0', 10),
+    };
+  }
+
   async create(
     ownerUserId: string,
     name: string,
