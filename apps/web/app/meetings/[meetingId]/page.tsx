@@ -101,9 +101,18 @@ export default function MeetingDetailPage() {
     );
   }
 
+  const [exportError, setExportError] = useState('');
+
   async function handleExport() {
-    const res = await api.post<{ export_job: ExportJob }>(`/meetings/${meetingId}/exports`, { export_type: 'json' });
-    setExports((prev) => [res.export_job, ...prev]);
+    setExportError('');
+    try {
+      const res = await api.post<{ export_job: ExportJob }>(`/meetings/${meetingId}/exports`, { export_type: 'json' });
+      setExports((prev) => [res.export_job, ...prev]);
+    } catch (err: unknown) {
+      const data = (err as { data?: { message?: string }; status?: number })?.data;
+      const status = (err as { status?: number })?.status;
+      setExportError(`Export failed (${status || '?'}): ${data?.message || (err instanceof Error ? err.message : 'Unknown error')}`);
+    }
   }
 
   async function handleCloseMeeting() {
@@ -330,17 +339,27 @@ export default function MeetingDetailPage() {
               <button onClick={handleExport} className="mb-3 rounded bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700">
                 Export Meeting Data
               </button>
+              {exportError && (
+                <div className="mb-3 rounded bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-3 text-xs text-red-700 dark:text-red-300 font-mono break-all">
+                  {exportError}
+                </div>
+              )}
               {exports.length > 0 && (
                 <ul className="space-y-1.5">
                   {exports.map((exp) => (
                     <li key={exp.id} className="flex items-center justify-between rounded border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          exp.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
-                          exp.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
-                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
-                        }`}>{exp.status}</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(exp.created_at).toLocaleString()}</span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-0.5 rounded ${
+                            exp.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                            exp.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                            'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                          }`}>{exp.status}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(exp.created_at).toLocaleString()}</span>
+                        </div>
+                        {exp.error_message && (
+                          <p className="mt-1 text-xs text-red-600 dark:text-red-400 font-mono break-all">{exp.error_message}</p>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         {['pending', 'processing'].includes(exp.status) && (
