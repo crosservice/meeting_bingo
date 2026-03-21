@@ -7,7 +7,7 @@ Type=simple
 User=meetingbingo
 Group=meetingbingo
 WorkingDirectory={{APP_DIR}}/apps/web
-ExecStart=/usr/bin/node {{APP_DIR}}/apps/web/node_modules/.bin/next start
+ExecStart=/usr/bin/node {{APP_DIR}}/apps/web/node_modules/next/dist/bin/next start
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
