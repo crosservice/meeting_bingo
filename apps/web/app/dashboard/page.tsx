@@ -192,7 +192,25 @@ export default function DashboardPage() {
 
         {/* Active Meetings */}
         <section className="mb-6">
-          <h2 className="mb-3 text-lg font-semibold">Active Meetings</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Active Meetings</h2>
+            <button
+              onClick={async () => {
+                setFetching(true);
+                try {
+                  const [meetingsRes, statsRes] = await Promise.all([
+                    api.get<{ meetings: MeetingEnriched[] }>('/me/meetings/all'),
+                    api.get<{ stats: Stats }>('/me/stats'),
+                  ]);
+                  setMeetings(meetingsRes.meetings);
+                  setStats(statsRes.stats);
+                } catch {} finally { setFetching(false); }
+              }}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Refresh
+            </button>
+          </div>
           {fetching ? (
             <p className="text-sm text-gray-500">Loading...</p>
           ) : activeMeetings.length === 0 ? (
