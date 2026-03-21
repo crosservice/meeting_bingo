@@ -59,6 +59,30 @@ export class GamesRepository {
     return rows;
   }
 
+  async getMeetingLeaderboard(meetingId: string) {
+    const { rows } = await this.pool.query(
+      `SELECT
+         u.id AS user_id,
+         u.nickname,
+         count(DISTINCT gc.game_id) AS games_played,
+         count(DISTINCT gc.game_id) FILTER (WHERE g.winner_user_id = u.id) AS wins,
+         count(DISTINCT gc.game_id) FILTER (WHERE g.status IN ('won', 'closed') AND (g.winner_user_id IS NULL OR g.winner_user_id != u.id)) AS losses
+       FROM game_cards gc
+       JOIN games g ON g.id = gc.game_id AND g.meeting_id = $1 AND g.status IN ('won', 'closed')
+       JOIN users u ON u.id = gc.user_id
+       GROUP BY u.id, u.nickname
+       ORDER BY wins DESC, losses ASC, u.nickname ASC`,
+      [meetingId],
+    );
+    return rows.map((r: { user_id: string; nickname: string; games_played: string; wins: string; losses: string }) => ({
+      user_id: r.user_id,
+      nickname: r.nickname,
+      games_played: parseInt(r.games_played, 10),
+      wins: parseInt(r.wins, 10),
+      losses: parseInt(r.losses, 10),
+    }));
+  }
+
   async findActiveByMeeting(meetingId: string): Promise<GameRow | null> {
     const { rows } = await this.pool.query<GameRow>(
       `SELECT * FROM games WHERE meeting_id = $1 AND status = 'active' LIMIT 1`,

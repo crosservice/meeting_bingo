@@ -57,6 +57,7 @@ export default function MeetingDetailPage() {
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [games, setGames] = useState<Game[]>([]);
+  const [leaderboard, setLeaderboard] = useState<{ user_id: string; nickname: string; games_played: number; wins: number; losses: number }[]>([]);
   const [exports, setExports] = useState<ExportJob[]>([]);
   const [prompts, setPrompts] = useState<AnalysisPrompt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,11 +71,13 @@ export default function MeetingDetailPage() {
       api.get<{ meeting: Meeting }>(`/meetings/${meetingId}`),
       api.get<{ participants: Participant[] }>(`/meetings/${meetingId}/participants`).catch(() => ({ participants: [] })),
       api.get<{ games: Game[] }>(`/meetings/${meetingId}/games`).catch(() => ({ games: [] })),
+      api.get<{ leaderboard: { user_id: string; nickname: string; games_played: number; wins: number; losses: number }[] }>(`/meetings/${meetingId}/leaderboard`).catch(() => ({ leaderboard: [] })),
     ])
-      .then(([meetingRes, participantsRes, gamesRes]) => {
+      .then(([meetingRes, participantsRes, gamesRes, lbRes]) => {
         setMeeting(meetingRes.meeting);
         setParticipants(participantsRes.participants);
         setGames(gamesRes.games);
+        setLeaderboard(lbRes.leaderboard);
       })
       .catch(() => setError('Failed to load meeting'))
       .finally(() => setLoading(false));
@@ -196,6 +199,45 @@ export default function MeetingDetailPage() {
               </ul>
             )}
           </section>
+
+          {/* Leaderboard */}
+          {leaderboard.length > 0 && (
+            <section className="rounded-lg border border-gray-200 dark:border-gray-700 p-5">
+              <h2 className="mb-3 text-lg font-semibold">Leaderboard</h2>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                    <th className="pb-2 pr-2">#</th>
+                    <th className="pb-2">Player</th>
+                    <th className="pb-2 text-center">W</th>
+                    <th className="pb-2 text-center">L</th>
+                    <th className="pb-2 text-center">Played</th>
+                    <th className="pb-2 text-right">Win %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboard.map((p, i) => (
+                    <tr
+                      key={p.user_id}
+                      className={`border-b border-gray-100 dark:border-gray-800 ${p.user_id === user?.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                    >
+                      <td className="py-1.5 pr-2 font-semibold text-gray-400">{i + 1}</td>
+                      <td className="py-1.5">
+                        {p.nickname}
+                        {i === 0 && p.wins > 0 && <span className="ml-1.5 text-yellow-500" title="Leader">&#9733;</span>}
+                      </td>
+                      <td className="py-1.5 text-center text-green-600 dark:text-green-400 font-medium">{p.wins}</td>
+                      <td className="py-1.5 text-center text-red-500 dark:text-red-400">{p.losses}</td>
+                      <td className="py-1.5 text-center text-gray-500 dark:text-gray-400">{p.games_played}</td>
+                      <td className="py-1.5 text-right font-medium">
+                        {p.games_played > 0 ? `${Math.round((p.wins / p.games_played) * 100)}%` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
 
           {/* Games — visible to ALL participants */}
           {games.filter((g) => ['active', 'won', 'closed'].includes(g.status)).length > 0 && (

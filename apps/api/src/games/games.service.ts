@@ -301,6 +301,10 @@ export class GamesService {
     return response;
   }
 
+  async getMeetingLeaderboard(meetingId: string) {
+    return this.repo.getMeetingLeaderboard(meetingId);
+  }
+
   async findActiveByMeeting(meetingId: string) {
     return this.repo.findActiveByMeeting(meetingId);
   }

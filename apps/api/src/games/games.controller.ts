@@ -40,6 +40,15 @@ export class GamesController {
     return { games };
   }
 
+  @Get('meetings/:meetingId/leaderboard')
+  async leaderboard(
+    @Param('meetingId') meetingId: string,
+    @CurrentUser() _user: AuthenticatedUser,
+  ) {
+    const leaderboard = await this.gamesService.getMeetingLeaderboard(meetingId);
+    return { leaderboard };
+  }
+
   @Post('games/:gameId/start')
   @HttpCode(HttpStatus.OK)
   async start(
