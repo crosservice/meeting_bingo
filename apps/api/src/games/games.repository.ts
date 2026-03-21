@@ -60,26 +60,38 @@ export class GamesRepository {
   }
 
   async getMeetingLeaderboard(meetingId: string) {
+    // Win % is based on total completed games in the meeting, not per-player participation
     const { rows } = await this.pool.query(
-      `SELECT
-         u.id AS user_id,
+      `WITH total AS (
+         SELECT count(*) AS total_games
+         FROM games
+         WHERE meeting_id = $1 AND status IN ('won', 'closed')
+       )
+       SELECT
+         mm.user_id,
          u.nickname,
-         count(DISTINCT gc.game_id) AS games_played,
-         count(DISTINCT gc.game_id) FILTER (WHERE g.winner_user_id = u.id) AS wins,
-         count(DISTINCT gc.game_id) FILTER (WHERE g.status IN ('won', 'closed') AND (g.winner_user_id IS NULL OR g.winner_user_id != u.id)) AS losses
-       FROM game_cards gc
-       JOIN games g ON g.id = gc.game_id AND g.meeting_id = $1 AND g.status IN ('won', 'closed')
-       JOIN users u ON u.id = gc.user_id
-       GROUP BY u.id, u.nickname
+         total.total_games::int AS total_meeting_games,
+         coalesce(wins.win_count, 0)::int AS wins,
+         (total.total_games - coalesce(wins.win_count, 0))::int AS losses
+       FROM meeting_memberships mm
+       JOIN users u ON u.id = mm.user_id
+       CROSS JOIN total
+       LEFT JOIN (
+         SELECT winner_user_id, count(*) AS win_count
+         FROM games
+         WHERE meeting_id = $1 AND status = 'won' AND winner_user_id IS NOT NULL
+         GROUP BY winner_user_id
+       ) wins ON wins.winner_user_id = mm.user_id
+       WHERE mm.meeting_id = $1 AND mm.deleted_at IS NULL AND total.total_games > 0
        ORDER BY wins DESC, losses ASC, u.nickname ASC`,
       [meetingId],
     );
-    return rows.map((r: { user_id: string; nickname: string; games_played: string; wins: string; losses: string }) => ({
+    return rows.map((r: { user_id: string; nickname: string; total_meeting_games: number; wins: number; losses: number }) => ({
       user_id: r.user_id,
       nickname: r.nickname,
-      games_played: parseInt(r.games_played, 10),
-      wins: parseInt(r.wins, 10),
-      losses: parseInt(r.losses, 10),
+      games_played: r.total_meeting_games,
+      wins: r.wins,
+      losses: r.losses,
     }));
   }
 
