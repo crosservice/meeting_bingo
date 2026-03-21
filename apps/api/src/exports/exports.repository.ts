@@ -147,10 +147,10 @@ export class ExportsRepository {
       `SELECT * FROM audit_events
        WHERE (entity_type = 'meeting' AND entity_id = $1)
           OR (entity_type IN ('game', 'invite', 'membership', 'phrase_set') AND entity_id IN (
-            SELECT id::text FROM games WHERE meeting_id = $1
-            UNION SELECT id::text FROM meeting_invites WHERE meeting_id = $1
-            UNION SELECT id::text FROM meeting_memberships WHERE meeting_id = $1
-            UNION SELECT id::text FROM phrase_sets WHERE meeting_id = $1
+            SELECT id::text FROM games WHERE meeting_id = $1::uuid
+            UNION SELECT id::text FROM meeting_invites WHERE meeting_id = $1::uuid
+            UNION SELECT id::text FROM meeting_memberships WHERE meeting_id = $1::uuid
+            UNION SELECT id::text FROM phrase_sets WHERE meeting_id = $1::uuid
           ))
        ORDER BY occurred_at`,
       [meetingId],
