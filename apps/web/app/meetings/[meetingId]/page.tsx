@@ -178,6 +178,19 @@ export default function MeetingDetailPage() {
                     {isOwner && p.role !== 'owner' && p.access_status === 'active' && (
                       <button onClick={() => handleRevoke(p.user_id)} className="text-xs text-red-600 hover:underline">Revoke</button>
                     )}
+                    {isOwner && p.role !== 'owner' && p.access_status === 'revoked' && (
+                      <button
+                        onClick={async () => {
+                          await api.post(`/meetings/${meetingId}/participants/${p.user_id}/unrevoke`);
+                          setParticipants((prev) =>
+                            prev.map((x) => (x.user_id === p.user_id ? { ...x, access_status: 'active' } : x)),
+                          );
+                        }}
+                        className="text-xs text-green-600 hover:underline"
+                      >
+                        Restore
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

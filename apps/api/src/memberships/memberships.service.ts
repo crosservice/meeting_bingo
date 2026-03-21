@@ -62,6 +62,24 @@ export class MembershipsService {
     });
   }
 
+  async unrevokeParticipant(meetingId: string, targetUserId: string, actorUserId: string) {
+    await this.meetingsService.assertOwner(meetingId, actorUserId);
+
+    const membership = await this.repo.findByMeetingAndUser(meetingId, targetUserId);
+    if (!membership) {
+      throw new NotFoundException('Participant not found');
+    }
+    if (membership.access_status !== 'revoked') {
+      throw new BadRequestException('Participant is not revoked');
+    }
+
+    await this.repo.unrevoke(membership.id);
+    await this.audit.log(actorUserId, 'membership', membership.id, 'member.unrevoked', {
+      target_user_id: targetUserId,
+      meeting_id: meetingId,
+    });
+  }
+
   async assertActiveMember(meetingId: string, userId: string) {
     const membership = await this.repo.findByMeetingAndUser(meetingId, userId);
     if (!membership || membership.access_status !== 'active') {

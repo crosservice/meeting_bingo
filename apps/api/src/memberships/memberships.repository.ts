@@ -51,6 +51,15 @@ export class MembershipsRepository {
     );
   }
 
+  async unrevoke(id: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE meeting_memberships
+       SET access_status = 'active', revoked_at = NULL, revoked_by_user_id = NULL
+       WHERE id = $1`,
+      [id],
+    );
+  }
+
   async createOwnerMembership(meetingId: string, userId: string): Promise<void> {
     await this.pool.query(
       `INSERT INTO meeting_memberships (meeting_id, user_id, role, access_status)

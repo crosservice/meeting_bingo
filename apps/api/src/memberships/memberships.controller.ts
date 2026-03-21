@@ -25,4 +25,15 @@ export class MembershipsController {
     await this.membershipsService.revokeParticipant(meetingId, userId, user.id);
     return { message: 'Participant revoked' };
   }
+
+  @Post(':userId/unrevoke')
+  @HttpCode(HttpStatus.OK)
+  async unrevoke(
+    @Param('meetingId') meetingId: string,
+    @Param('userId') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.membershipsService.unrevokeParticipant(meetingId, userId, user.id);
+    return { message: 'Participant restored' };
+  }
 }
