@@ -144,15 +144,17 @@ export class ExportsRepository {
 
   async getAuditEvents(meetingId: string) {
     const { rows } = await this.pool.query(
-      `SELECT * FROM audit_events
-       WHERE (entity_type = 'meeting' AND entity_id = $1)
-          OR (entity_type IN ('game', 'invite', 'membership', 'phrase_set') AND entity_id IN (
+      `SELECT ae.*, u.nickname AS actor_nickname
+       FROM audit_events ae
+       LEFT JOIN users u ON u.id = ae.actor_user_id
+       WHERE (ae.entity_type = 'meeting' AND ae.entity_id = $1)
+          OR (ae.entity_type IN ('game', 'invite', 'membership', 'phrase_set') AND ae.entity_id IN (
             SELECT id::text FROM games WHERE meeting_id = $1::uuid
             UNION SELECT id::text FROM meeting_invites WHERE meeting_id = $1::uuid
             UNION SELECT id::text FROM meeting_memberships WHERE meeting_id = $1::uuid
             UNION SELECT id::text FROM phrase_sets WHERE meeting_id = $1::uuid
           ))
-       ORDER BY occurred_at`,
+       ORDER BY ae.occurred_at`,
       [meetingId],
     );
     return rows;
