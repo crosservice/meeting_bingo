@@ -247,7 +247,7 @@ export default function MeetingDetailPage() {
                           <button onClick={() => refreshExport(exp.id)} className="text-xs text-blue-600 hover:underline">Refresh</button>
                         )}
                         {exp.file_path && (
-                          <a href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${exp.file_path}`}
+                          <a href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/exports/${exp.id}/download`}
                             className="text-xs text-blue-600 hover:underline">Download</a>
                         )}
                       </div>

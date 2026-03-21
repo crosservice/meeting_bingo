@@ -60,6 +60,8 @@ export default function PlayPage() {
   const [chatInput, setChatInput] = useState('');
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState('');
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [kicked, setKicked] = useState(false);
 
   const fetchRankings = useCallback(async () => {
     try {
@@ -77,12 +79,13 @@ export default function PlayPage() {
           api.get<{ game: GameInfo }>(`/games/${gameId}`),
           api.get<{ card: { cells: Cell[] } }>(`/games/${gameId}/cards/me`),
           api.get<{ messages: ChatMsg[] }>(`/meetings/${meetingId}/chat?limit=50`).catch(() => ({ messages: [] })),
-          api.get<{ meeting: { chat_enabled: boolean } }>(`/meetings/${meetingId}`).catch(() => ({ meeting: { chat_enabled: true } })),
+          api.get<{ meeting: { chat_enabled: boolean; owner_user_id: string } }>(`/meetings/${meetingId}`).catch(() => ({ meeting: { chat_enabled: true, owner_user_id: '' } })),
         ]);
         setGame(gameRes.game);
         setCells(cardRes.card.cells);
         setChatMessages(chatRes.messages);
         setChatEnabled(meetingRes.meeting.chat_enabled);
+        setOwnerUserId(meetingRes.meeting.owner_user_id);
         await fetchRankings();
 
         if (gameRes.game.winner_user_id) {
@@ -144,6 +147,13 @@ export default function PlayPage() {
         m.id === data.message_id ? { ...m, moderation_status: 'hidden', message_text: '[message hidden]' } : m,
       ),
     );
+  });
+
+  // Listen for participant revocation
+  useSocketEvent<{ user_id: string }>('participant.revoked', (data) => {
+    if (data.user_id === user?.id) {
+      setKicked(true);
+    }
   });
 
   // Fallback: poll rankings every 5 seconds in case WS is disconnected
@@ -250,6 +260,37 @@ export default function PlayPage() {
     } finally {
       setChatSending(false);
     }
+  }
+
+  const isOwner = user && ownerUserId && user.id === ownerUserId;
+
+  async function handleHideMessage(msgId: string) {
+    try {
+      await api.post(`/chat/${msgId}/hide`);
+      setChatMessages((prev) =>
+        prev.map((m) =>
+          m.id === msgId ? { ...m, moderation_status: 'hidden', message_text: '[message hidden]' } : m,
+        ),
+      );
+    } catch {
+      // Ignore hide errors
+    }
+  }
+
+  if (kicked) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <div className="text-center max-w-md p-8">
+          <h1 className="text-2xl font-bold mb-4">Removed from Meeting</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            You have been removed from this meeting by the owner.
+          </p>
+          <Link href="/dashboard" className="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700">
+            Back to Dashboard
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   if (loading) {
@@ -394,9 +435,20 @@ export default function PlayPage() {
 
               <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5 text-xs">
                 {chatMessages.map((msg) => (
-                  <div key={msg.id} className={msg.moderation_status === 'hidden' ? 'opacity-50' : ''}>
-                    <span className="font-semibold">{msg.nickname}: </span>
-                    <span>{msg.message_text}</span>
+                  <div key={msg.id} className={`flex items-start justify-between gap-1 ${msg.moderation_status === 'hidden' ? 'opacity-50' : ''}`}>
+                    <div>
+                      <span className="font-semibold">{msg.nickname}: </span>
+                      <span>{msg.message_text}</span>
+                    </div>
+                    {isOwner && msg.moderation_status !== 'hidden' && (
+                      <button
+                        onClick={() => handleHideMessage(msg.id)}
+                        className="shrink-0 text-gray-400 hover:text-red-500 text-[10px] leading-none mt-0.5"
+                        title="Hide message"
+                      >
+                        x
+                      </button>
+                    )}
                   </div>
                 ))}
                 {chatMessages.length === 0 && (
