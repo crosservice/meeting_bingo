@@ -83,7 +83,7 @@ export class MeetingsRepository {
               (SELECT g.winner_user_id FROM games g WHERE g.meeting_id = m.id AND g.status = 'won' ORDER BY g.ended_at DESC LIMIT 1) AS last_winner_user_id,
               (SELECT u2.nickname FROM games g JOIN users u2 ON u2.id = g.winner_user_id WHERE g.meeting_id = m.id AND g.status = 'won' ORDER BY g.ended_at DESC LIMIT 1) AS last_winner_nickname
        FROM meetings m
-       JOIN meeting_memberships mm ON mm.meeting_id = m.id AND mm.user_id = $1 AND mm.deleted_at IS NULL
+       JOIN meeting_memberships mm ON mm.meeting_id = m.id AND mm.user_id = $1 AND mm.deleted_at IS NULL AND mm.access_status = 'active'
        JOIN users owner ON owner.id = m.owner_user_id
        WHERE m.deleted_at IS NULL
        ORDER BY

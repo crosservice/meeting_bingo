@@ -205,12 +205,14 @@ export class GamesService {
   async getById(gameId: string, userId: string) {
     const game = await this.repo.findById(gameId);
     if (!game) throw new NotFoundException('Game not found');
+    await this.membershipsService.assertActiveMember(game.meeting_id, userId);
     return toGameResponse(game);
   }
 
   async getMyCard(gameId: string, userId: string) {
     const game = await this.repo.findById(gameId);
     if (!game) throw new NotFoundException('Game not found');
+    await this.membershipsService.assertActiveMember(game.meeting_id, userId);
 
     let card = await this.repo.findCardByGameAndUser(gameId, userId);
 
