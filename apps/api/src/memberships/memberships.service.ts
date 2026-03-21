@@ -57,9 +57,13 @@ export class MembershipsService {
     });
 
     // Notify the revoked user in real-time
-    this.wsGateway.emitToUser(targetUserId, ServerEvents.ParticipantRevoked, {
-      meeting_id: meetingId,
-    });
+    try {
+      this.wsGateway.emitToUser(targetUserId, ServerEvents.ParticipantRevoked, {
+        meeting_id: meetingId,
+      });
+    } catch {
+      // WS emit is best-effort
+    }
   }
 
   async unrevokeParticipant(meetingId: string, targetUserId: string, actorUserId: string) {

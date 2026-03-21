@@ -309,8 +309,9 @@ export default function PlayPage() {
       setParticipants((prev) =>
         prev.map((p) => (p.user_id === targetUserId ? { ...p, access_status: 'revoked' } : p)),
       );
-    } catch (err) {
-      alert(`Failed to kick: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } catch (err: unknown) {
+      const data = (err as { data?: { message?: string } })?.data;
+      alert(`Failed to kick: ${data?.message || (err instanceof Error ? err.message : 'Unknown error')}`);
     }
   }
 
