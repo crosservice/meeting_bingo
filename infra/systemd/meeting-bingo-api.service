@@ -1,0 +1,36 @@
+[Unit]
+Description=Meeting Bingo API (NestJS)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=meetingbingo
+Group=meetingbingo
+WorkingDirectory={{APP_DIR}}
+ExecStart=/usr/bin/node {{APP_DIR}}/apps/api/dist/main.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+EnvironmentFile={{APP_DIR}}/.env
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{APP_DIR}}/data
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=meeting-bingo-api
+
+[Install]
+WantedBy=multi-user.target

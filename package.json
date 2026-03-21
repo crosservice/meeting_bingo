@@ -1,0 +1,39 @@
+{
+  "name": "meeting-bingo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Real-time Meeting Bingo application",
+  "scripts": {
+    "dev": "pnpm --parallel -r run dev",
+    "dev:web": "pnpm --filter @meeting-bingo/web run dev",
+    "dev:api": "pnpm --filter @meeting-bingo/api run dev",
+    "build": "pnpm -r run build",
+    "build:packages": "pnpm --filter \"@meeting-bingo/types\" --filter \"@meeting-bingo/config\" --filter \"@meeting-bingo/validation\" --filter \"@meeting-bingo/ui\" run build",
+    "build:web": "pnpm --filter @meeting-bingo/web run build",
+    "build:api": "pnpm --filter @meeting-bingo/api run build",
+    "lint": "pnpm -r run lint",
+    "lint:fix": "pnpm -r run lint -- --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "pnpm -r run clean",
+    "typecheck": "pnpm -r run typecheck",
+    "migrate": "tsx scripts/migrate.ts",
+    "seed": "tsx scripts/seed.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@types/pg": "^8.20.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^10.0.0",
+    "pg": "^8.20.0",
+    "prettier": "^3.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.20.0"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.9"
+}

@@ -1,0 +1,34 @@
+[Unit]
+Description=Meeting Bingo Web (Next.js)
+After=network.target meeting-bingo-api.service
+
+[Service]
+Type=simple
+User=meetingbingo
+Group=meetingbingo
+WorkingDirectory={{APP_DIR}}/apps/web
+ExecStart=/usr/bin/node {{APP_DIR}}/apps/web/node_modules/.bin/next start
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+EnvironmentFile={{APP_DIR}}/.env
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=meeting-bingo-web
+
+[Install]
+WantedBy=multi-user.target
