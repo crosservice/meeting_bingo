@@ -42,6 +42,13 @@ interface AnalysisPrompt {
   prompt: string;
 }
 
+interface Game {
+  id: string;
+  status: string;
+  started_at: string | null;
+  winner_user_id: string | null;
+}
+
 export default function MeetingDetailPage() {
   const params = useParams();
   const meetingId = params.meetingId as string;
@@ -49,6 +56,7 @@ export default function MeetingDetailPage() {
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
   const [exports, setExports] = useState<ExportJob[]>([]);
   const [prompts, setPrompts] = useState<AnalysisPrompt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,10 +69,12 @@ export default function MeetingDetailPage() {
     Promise.all([
       api.get<{ meeting: Meeting }>(`/meetings/${meetingId}`),
       api.get<{ participants: Participant[] }>(`/meetings/${meetingId}/participants`).catch(() => ({ participants: [] })),
+      api.get<{ games: Game[] }>(`/meetings/${meetingId}/games`).catch(() => ({ games: [] })),
     ])
-      .then(([meetingRes, participantsRes]) => {
+      .then(([meetingRes, participantsRes, gamesRes]) => {
         setMeeting(meetingRes.meeting);
         setParticipants(participantsRes.participants);
+        setGames(gamesRes.games);
       })
       .catch(() => setError('Failed to load meeting'))
       .finally(() => setLoading(false));
@@ -173,6 +183,36 @@ export default function MeetingDetailPage() {
               </ul>
             )}
           </section>
+
+          {/* Active Game — visible to ALL participants */}
+          {games.filter((g) => g.status === 'active' || g.status === 'won').length > 0 && (
+            <section className="rounded-lg border-2 border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 p-5">
+              <h2 className="mb-3 text-lg font-semibold">Active Game</h2>
+              {games
+                .filter((g) => g.status === 'active' || g.status === 'won')
+                .map((g) => (
+                  <div key={g.id} className="flex items-center justify-between">
+                    <div className="text-sm">
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        g.status === 'active' ? 'bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-200' :
+                        'bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-200'
+                      }`}>{g.status}</span>
+                      {g.started_at && (
+                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                          Started {new Date(g.started_at).toLocaleTimeString()}
+                        </span>
+                      )}
+                    </div>
+                    <Link
+                      href={`/meetings/${meetingId}/game/${g.id}`}
+                      className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                    >
+                      Play Bingo
+                    </Link>
+                  </div>
+                ))}
+            </section>
+          )}
 
           {/* Owner controls */}
           {isOwner && (
