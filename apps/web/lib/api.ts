@@ -1,5 +1,9 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+// In production, all API calls go through /api/* which Nginx proxies to NestJS.
+// In development, calls go directly to the NestJS port (no prefix needed).
+const API_PREFIX = typeof window !== 'undefined' && API_URL.includes('localhost') ? '' : '/api';
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -11,7 +15,7 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_URL}${path}`;
+  const url = `${API_URL}${API_PREFIX}${path}`;
 
   const res = await fetch(url, {
     ...options,
@@ -24,7 +28,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   // If unauthorized, try to refresh
   if (res.status === 401 && !path.includes('/auth/refresh')) {
-    const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
+    const refreshRes = await fetch(`${API_URL}${API_PREFIX}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
     });
