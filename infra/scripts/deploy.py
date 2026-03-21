@@ -6,13 +6,14 @@ Zero-touch provisioning for Ubuntu 24.04 LTS.
 All passwords, secrets, and credentials are auto-generated and saved to .env.
 Idempotent — safe to rerun. On rerun, existing .env secrets are preserved.
 
+Output streams live so you can see progress. Stops on first failure.
+
 Usage:
     sudo python3 infra/scripts/deploy.py --domain bingo.example.com --tls-email you@example.com
 """
 
 import argparse
 import os
-import re
 import subprocess
 import sys
 import shutil
@@ -31,18 +32,76 @@ class StepResult:
         self.remediation = remediation
 
 results: list[StepResult] = []
+current_step_name: str = ""
 
 def record(name, status, message, remediation=None):
     results.append(StepResult(name, status, message, remediation))
-    icon = {"PASS": "\u2713", "SKIP": "\u2013", "FAIL": "\u2717"}[status]
-    print(f"  [{status}] {icon} {name}: {message}")
 
-def run(cmd, check=True, capture=True, **kwargs):
-    """Run a shell command, return CompletedProcess."""
-    return subprocess.run(
-        cmd, shell=True, check=check,
-        capture_output=capture, text=True, **kwargs
-    )
+def log(msg):
+    """Print a timestamped log line."""
+    ts = time.strftime("%H:%M:%S")
+    print(f"  [{ts}] {msg}", flush=True)
+
+def step_start(name):
+    """Mark the beginning of a step with a visible header."""
+    global current_step_name
+    current_step_name = name
+    step_num = len(results) + 1
+    print(flush=True)
+    print(f"  ── Step {step_num}: {name} ──", flush=True)
+
+def step_pass(message):
+    record(current_step_name, "PASS", message)
+    log(f"\u2713 {message}")
+
+def step_skip(message):
+    record(current_step_name, "SKIP", message)
+    log(f"\u2013 {message}")
+
+def step_fail(message, remediation=None):
+    record(current_step_name, "FAIL", message, remediation)
+    log(f"\u2717 FAILED: {message}")
+    if remediation:
+        log(f"  Fix: {remediation}")
+
+class DeploymentFailed(Exception):
+    """Raised to stop deployment on first failure."""
+    pass
+
+def run(cmd, check=True, stream=False):
+    """
+    Run a shell command.
+    If stream=True, output is printed live to the terminal.
+    If stream=False, output is captured and returned.
+    """
+    if stream:
+        # Stream output live so user sees progress
+        result = subprocess.run(
+            cmd, shell=True,
+            stdout=sys.stdout, stderr=sys.stderr,
+            text=True,
+        )
+        if check and result.returncode != 0:
+            raise subprocess.CalledProcessError(result.returncode, cmd)
+        return result
+    else:
+        result = subprocess.run(
+            cmd, shell=True,
+            capture_output=True, text=True,
+        )
+        if check and result.returncode != 0:
+            raise subprocess.CalledProcessError(
+                result.returncode, cmd, result.stdout, result.stderr
+            )
+        return result
+
+def run_quiet(cmd, check=True):
+    """Run a command with output captured (not shown)."""
+    return run(cmd, check=check, stream=False)
+
+def run_live(cmd, check=True):
+    """Run a command with live output streaming."""
+    return run(cmd, check=check, stream=True)
 
 def cmd_exists(name):
     return shutil.which(name) is not None
@@ -52,16 +111,12 @@ def generate_secret(length=48):
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 def generate_password(length=32):
-    """Generate a strong password safe for use in shell and connection strings."""
-    # Avoid characters that cause issues in URLs or shell: @, :, /, ?, #, etc.
     alphabet = string.ascii_letters + string.digits + '!$^&*-_=+'
-    pw = ''.join(secrets.choice(alphabet) for _ in range(length))
-    return pw
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 # ─── .env management ─────────────────────────────────────────────────────────
 
 def load_existing_env(env_path: Path) -> dict[str, str]:
-    """Parse an existing .env file into a dict, preserving generated secrets."""
     env = {}
     if not env_path.exists():
         return env
@@ -76,142 +131,153 @@ def load_existing_env(env_path: Path) -> dict[str, str]:
 
 # ─── Steps ────────────────────────────────────────────────────────────────────
 
-def step_validate_os():
-    name = "OS validation"
+def do_validate_os():
+    step_start("OS validation")
     try:
-        r = run("lsb_release -rs", check=False)
+        r = run_quiet("lsb_release -rs", check=False)
         if r.returncode != 0:
-            record(name, "PASS", "Could not detect version (proceeding)")
+            step_pass("Could not detect version (proceeding)")
             return
         ver = r.stdout.strip()
         if ver.startswith("24.04"):
-            record(name, "PASS", f"Ubuntu {ver}")
+            step_pass(f"Ubuntu {ver}")
         else:
-            record(name, "PASS", f"Ubuntu {ver} (expected 24.04, proceeding)")
+            step_pass(f"Ubuntu {ver} (expected 24.04, proceeding)")
     except Exception as e:
-        record(name, "FAIL", str(e), "Ensure running on Ubuntu 24.04 LTS")
+        step_fail(str(e), "Ensure running on Ubuntu 24.04 LTS")
+        raise DeploymentFailed()
 
-def step_install_packages():
-    name = "System packages"
+def do_install_packages():
+    step_start("System packages")
     try:
-        run("apt-get update -qq")
-        run("DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "
-            "build-essential curl git unzip software-properties-common "
-            "gnupg2 ca-certificates lsb-release jq")
-        record(name, "PASS", "Installed")
+        log("Updating apt package list...")
+        run_quiet("apt-get update -qq")
+        log("Installing build-essential, curl, git, jq...")
+        run_live("DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "
+                 "build-essential curl git unzip software-properties-common "
+                 "gnupg2 ca-certificates lsb-release jq")
+        step_pass("Installed")
     except Exception as e:
-        record(name, "FAIL", str(e), "Run this script as root: sudo python3 deploy.py ...")
+        step_fail(str(e), "Run this script as root: sudo python3 deploy.py ...")
+        raise DeploymentFailed()
 
-def step_install_node(node_major="22"):
-    name = "Node.js install"
+def do_install_node(node_major="22"):
+    step_start("Node.js install")
     try:
-        r = run("node --version", check=False)
+        r = run_quiet("node --version", check=False)
         if r.returncode == 0 and r.stdout.strip().startswith(f"v{node_major}"):
-            record(name, "SKIP", f"Node.js {r.stdout.strip()} already installed")
-            # Ensure pnpm
-            run("corepack enable", check=False)
+            run_quiet("corepack enable", check=False)
+            step_skip(f"Node.js {r.stdout.strip()} already installed")
             return
-        run(f"curl -fsSL https://deb.nodesource.com/setup_{node_major}.x | bash -")
-        run("apt-get install -y -qq nodejs")
-        run("corepack enable")
-        run("corepack prepare pnpm@latest --activate")
-        r2 = run("node --version")
-        record(name, "PASS", f"Node.js {r2.stdout.strip()} + pnpm installed")
+        log(f"Adding NodeSource v{node_major} repository...")
+        run_live(f"curl -fsSL https://deb.nodesource.com/setup_{node_major}.x | bash -")
+        log("Installing Node.js...")
+        run_live("apt-get install -y -qq nodejs")
+        log("Enabling pnpm via corepack...")
+        run_live("corepack enable")
+        run_live("corepack prepare pnpm@latest --activate")
+        r2 = run_quiet("node --version")
+        step_pass(f"Node.js {r2.stdout.strip()} + pnpm installed")
     except Exception as e:
-        record(name, "FAIL", str(e), "Check NodeSource repository setup")
+        step_fail(str(e), "Check NodeSource repository setup")
+        raise DeploymentFailed()
 
-def step_install_postgres():
-    name = "PostgreSQL"
+def do_install_postgres():
+    step_start("PostgreSQL")
     try:
-        r = run("pg_isready", check=False)
+        r = run_quiet("pg_isready", check=False)
         if r.returncode == 0:
-            record(name, "SKIP", "Already running")
+            step_skip("Already running")
             return
-        run("apt-get install -y -qq postgresql postgresql-contrib")
-        run("systemctl enable postgresql")
-        run("systemctl start postgresql")
-        record(name, "PASS", "Installed and started")
+        log("Installing PostgreSQL...")
+        run_live("apt-get install -y -qq postgresql postgresql-contrib")
+        run_quiet("systemctl enable postgresql")
+        run_quiet("systemctl start postgresql")
+        step_pass("Installed and started")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_create_database(cfg):
-    name = "Database setup"
+def do_create_database(cfg):
+    step_start("Database setup")
     try:
-        # Check if DB exists
-        r = run(f"sudo -u postgres psql -tAc \"SELECT 1 FROM pg_database WHERE datname='{cfg['db_name']}'\"",
-                check=False)
+        r = run_quiet(
+            f"sudo -u postgres psql -tAc \"SELECT 1 FROM pg_database WHERE datname='{cfg['db_name']}'\"",
+            check=False)
         if r.stdout.strip() == "1":
-            record(name, "SKIP", f"Database '{cfg['db_name']}' already exists")
+            step_skip(f"Database '{cfg['db_name']}' already exists")
             return
-        # Create user (ignore error if exists)
-        run(f"sudo -u postgres psql -c \"CREATE USER {cfg['db_user']} WITH PASSWORD '{cfg['db_password']}'\"",
+        log(f"Creating database user '{cfg['db_user']}'...")
+        run_quiet(
+            f"sudo -u postgres psql -c \"CREATE USER {cfg['db_user']} WITH PASSWORD '{cfg['db_password']}'\"",
             check=False)
-        # Update password in case user existed with different password
-        run(f"sudo -u postgres psql -c \"ALTER USER {cfg['db_user']} WITH PASSWORD '{cfg['db_password']}'\"",
+        run_quiet(
+            f"sudo -u postgres psql -c \"ALTER USER {cfg['db_user']} WITH PASSWORD '{cfg['db_password']}'\"",
             check=False)
-        # Create database
-        run(f"sudo -u postgres psql -c \"CREATE DATABASE {cfg['db_name']} OWNER {cfg['db_user']}\"")
-        # Restrict to localhost (pg_hba.conf is localhost-only by default on Ubuntu)
-        record(name, "PASS", f"Database '{cfg['db_name']}' created with user '{cfg['db_user']}'")
+        log(f"Creating database '{cfg['db_name']}'...")
+        run_quiet(f"sudo -u postgres psql -c \"CREATE DATABASE {cfg['db_name']} OWNER {cfg['db_user']}\"")
+        step_pass(f"Database '{cfg['db_name']}' created with user '{cfg['db_user']}'")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e), "Check PostgreSQL is running: systemctl status postgresql")
+        raise DeploymentFailed()
 
-def step_install_nginx():
-    name = "Nginx install"
+def do_install_nginx():
+    step_start("Nginx")
     try:
         if cmd_exists("nginx"):
-            record(name, "SKIP", "Already installed")
+            step_skip("Already installed")
             return
-        run("apt-get install -y -qq nginx")
-        run("systemctl enable nginx")
-        record(name, "PASS", "Installed")
+        log("Installing Nginx...")
+        run_live("apt-get install -y -qq nginx")
+        run_quiet("systemctl enable nginx")
+        step_pass("Installed")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_install_certbot():
-    name = "Certbot install"
+def do_install_certbot():
+    step_start("Certbot")
     try:
         if cmd_exists("certbot"):
-            record(name, "SKIP", "Already installed")
+            step_skip("Already installed")
             return
-        run("apt-get install -y -qq certbot python3-certbot-nginx")
-        record(name, "PASS", "Installed")
+        log("Installing Certbot...")
+        run_live("apt-get install -y -qq certbot python3-certbot-nginx")
+        step_pass("Installed")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_create_service_user():
-    name = "Service user"
+def do_create_service_user():
+    step_start("Service user")
     try:
-        r = run("id meetingbingo", check=False)
+        r = run_quiet("id meetingbingo", check=False)
         if r.returncode == 0:
-            record(name, "SKIP", "'meetingbingo' already exists")
+            step_skip("'meetingbingo' already exists")
             return
-        run("useradd --system --no-create-home --shell /usr/sbin/nologin meetingbingo")
-        record(name, "PASS", "User 'meetingbingo' created (non-root, no login)")
+        run_quiet("useradd --system --no-create-home --shell /usr/sbin/nologin meetingbingo")
+        step_pass("User 'meetingbingo' created (non-root, no login)")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_create_app_dirs(app_dir):
-    name = "App directories"
+def do_create_app_dirs(app_dir):
+    step_start("App directories")
     try:
         for sub in ["data/exports", "data/backups"]:
             (Path(app_dir) / sub).mkdir(parents=True, exist_ok=True)
-        run(f"chown -R meetingbingo:meetingbingo {app_dir}/data")
-        record(name, "PASS", f"{app_dir}/data/{{exports,backups}} created")
+        run_quiet(f"chown -R meetingbingo:meetingbingo {app_dir}/data")
+        step_pass(f"{app_dir}/data/{{exports,backups}} created")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_create_env_file(app_dir, cfg, force_env):
-    """
-    Create or update .env file. On first run, generates all secrets.
-    On rerun, preserves existing secrets and only updates non-secret values.
-    """
-    name = "Environment file"
+def do_create_env_file(app_dir, cfg, force_env):
+    step_start("Environment file")
     try:
         env_path = Path(app_dir) / ".env"
         existing = load_existing_env(env_path)
 
-        # Preserve or generate secrets
         jwt_secret = existing.get("JWT_SECRET") or generate_secret()
         jwt_refresh = existing.get("JWT_REFRESH_SECRET") or generate_secret()
         db_password = existing.get("DB_PASSWORD") or cfg["db_password"]
@@ -219,20 +285,17 @@ def step_create_env_file(app_dir, cfg, force_env):
         is_new = not env_path.exists()
 
         if env_path.exists() and not force_env:
-            # On rerun: only update non-secret config values, keep secrets intact
-            # Check if domain/ports changed
             needs_update = False
             if existing.get("WEB_URL") != f"https://{cfg['domain']}":
                 needs_update = True
             if existing.get("API_PORT") != str(cfg['api_port']):
                 needs_update = True
             if not needs_update:
-                record(name, "SKIP", ".env exists with valid secrets (preserved)")
-                # Make sure cfg has the actual db_password from .env for later steps
                 cfg["db_password"] = db_password
+                step_skip(".env exists with valid secrets (preserved)")
                 return
-            # Fall through to rewrite with preserved secrets
 
+        log("Writing .env with auto-generated secrets...")
         env_content = f"""# Meeting Bingo — Auto-generated environment
 # Generated by deploy.py. Secrets are auto-created on first run and preserved on rerun.
 # To regenerate all secrets, delete this file and rerun deploy.py.
@@ -262,86 +325,92 @@ NEXT_PUBLIC_API_URL=https://{cfg['domain']}
 EXPORT_DIR={app_dir}/data/exports
 """
         env_path.write_text(env_content)
-        run(f"chown meetingbingo:meetingbingo {env_path}")
-        run(f"chmod 600 {env_path}")
-
-        # Update cfg so subsequent steps use the actual password
+        run_quiet(f"chown meetingbingo:meetingbingo {env_path}")
+        run_quiet(f"chmod 600 {env_path}")
         cfg["db_password"] = db_password
 
         if is_new:
-            record(name, "PASS", ".env created (all secrets auto-generated)")
+            step_pass(".env created (all secrets auto-generated)")
         else:
-            record(name, "PASS", ".env updated (existing secrets preserved)")
+            step_pass(".env updated (existing secrets preserved)")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_set_app_permissions(app_dir):
-    """Ensure the meetingbingo user can read the app and write to data/."""
-    name = "File permissions"
+def do_install_app_deps(app_dir):
+    step_start("App dependencies (pnpm install)")
     try:
-        # App files owned by root (read-only for service user)
-        run(f"chown -R root:meetingbingo {app_dir}")
-        run(f"chmod -R 750 {app_dir}")
-        # Data dir writable by service user
-        run(f"chown -R meetingbingo:meetingbingo {app_dir}/data")
-        run(f"chmod -R 770 {app_dir}/data")
-        # .env readable only by service user
+        log("Installing node packages — this may take several minutes on first run...")
+        run_live(f"cd {app_dir} && pnpm install --frozen-lockfile")
+        step_pass("Dependencies installed")
+    except Exception as e:
+        step_fail(str(e), "Check pnpm-lock.yaml exists and is up to date")
+        raise DeploymentFailed()
+
+def do_build_app(app_dir):
+    step_start("App build (pnpm build)")
+    try:
+        log("Building shared packages, NestJS API, and Next.js frontend...")
+        run_live(f"cd {app_dir} && pnpm run build")
+        step_pass("Frontend and backend built")
+    except Exception as e:
+        step_fail(str(e), "Check build output above for TypeScript errors")
+        raise DeploymentFailed()
+
+def do_set_permissions(app_dir):
+    step_start("File permissions")
+    try:
+        log("Setting ownership and permissions...")
+        run_quiet(f"chown -R root:meetingbingo {app_dir}")
+        run_quiet(f"chmod -R 750 {app_dir}")
+        run_quiet(f"chown -R meetingbingo:meetingbingo {app_dir}/data")
+        run_quiet(f"chmod -R 770 {app_dir}/data")
         env_path = Path(app_dir) / ".env"
         if env_path.exists():
-            run(f"chown meetingbingo:meetingbingo {env_path}")
-            run(f"chmod 600 {env_path}")
-        # node_modules needs to be accessible
+            run_quiet(f"chown meetingbingo:meetingbingo {env_path}")
+            run_quiet(f"chmod 600 {env_path}")
         nm = Path(app_dir) / "node_modules"
         if nm.exists():
-            run(f"chown -R root:meetingbingo {nm}")
-        record(name, "PASS", "App: root:meetingbingo 750, data: meetingbingo 770, .env: 600")
+            run_quiet(f"chown -R root:meetingbingo {nm}")
+        step_pass("app=root:meetingbingo 750, data=meetingbingo 770, .env=600")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_install_app_deps(app_dir):
-    name = "App dependencies"
-    try:
-        run(f"cd {app_dir} && pnpm install --frozen-lockfile")
-        record(name, "PASS", "Dependencies installed")
-    except Exception as e:
-        record(name, "FAIL", str(e), "Check pnpm-lock.yaml exists and is up to date")
-
-def step_build_app(app_dir):
-    name = "App build"
-    try:
-        run(f"cd {app_dir} && pnpm run build")
-        record(name, "PASS", "Frontend and backend built")
-    except Exception as e:
-        record(name, "FAIL", str(e), "Check build output for TypeScript errors")
-
-def step_run_migrations(app_dir, cfg):
-    name = "Database migrations"
+def do_run_migrations(app_dir, cfg):
+    step_start("Database migrations")
     try:
         db_url = f"postgresql://{cfg['db_user']}:{cfg['db_password']}@{cfg['db_host']}:{cfg['db_port']}/{cfg['db_name']}"
-        run(f"cd {app_dir} && DATABASE_URL='{db_url}' pnpm run migrate")
-        record(name, "PASS", "All migrations applied")
+        log("Running migrations...")
+        run_live(f"cd {app_dir} && DATABASE_URL='{db_url}' pnpm run migrate")
+        step_pass("All migrations applied")
     except Exception as e:
-        record(name, "FAIL", str(e), "Check DATABASE_URL and PostgreSQL connectivity")
+        step_fail(str(e), "Check DATABASE_URL and PostgreSQL connectivity")
+        raise DeploymentFailed()
 
-def step_configure_systemd(app_dir):
-    name = "Systemd services"
+def do_configure_systemd(app_dir):
+    step_start("Systemd services")
     try:
         for svc in ["meeting-bingo-api", "meeting-bingo-web"]:
             src = Path(app_dir) / "infra" / "systemd" / f"{svc}.service"
             dst = Path(f"/etc/systemd/system/{svc}.service")
             content = src.read_text().replace("{{APP_DIR}}", app_dir)
             dst.write_text(content)
+            log(f"Wrote {dst}")
 
-        run("systemctl daemon-reload")
-        run("systemctl enable meeting-bingo-api meeting-bingo-web")
-        run("systemctl restart meeting-bingo-api")
-        run("systemctl restart meeting-bingo-web")
-        record(name, "PASS", "Services configured, enabled, and started")
+        run_quiet("systemctl daemon-reload")
+        run_quiet("systemctl enable meeting-bingo-api meeting-bingo-web")
+        log("Starting meeting-bingo-api...")
+        run_quiet("systemctl restart meeting-bingo-api")
+        log("Starting meeting-bingo-web...")
+        run_quiet("systemctl restart meeting-bingo-web")
+        step_pass("Services configured, enabled, and started")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e), "Run: journalctl -u meeting-bingo-api -n 30")
+        raise DeploymentFailed()
 
-def step_configure_nginx(app_dir, cfg):
-    name = "Nginx config"
+def do_configure_nginx(app_dir, cfg):
+    step_start("Nginx config")
     try:
         src = Path(app_dir) / "infra" / "nginx" / "meeting-bingo.conf"
         content = src.read_text()
@@ -351,82 +420,82 @@ def step_configure_nginx(app_dir, cfg):
 
         dst = Path("/etc/nginx/sites-available/meeting-bingo")
         dst.write_text(content)
+        log(f"Wrote {dst}")
 
         link = Path("/etc/nginx/sites-enabled/meeting-bingo")
         if link.is_symlink() or link.exists():
             link.unlink()
         link.symlink_to(dst)
 
-        # Remove default site
         default_link = Path("/etc/nginx/sites-enabled/default")
         if default_link.exists():
             default_link.unlink()
+            log("Removed default nginx site")
 
-        run("nginx -t")
-        run("systemctl reload nginx")
-        record(name, "PASS", f"Nginx configured for {cfg['domain']}")
+        log("Testing nginx config...")
+        run_live("nginx -t")
+        run_quiet("systemctl reload nginx")
+        step_pass(f"Nginx configured for {cfg['domain']}")
     except Exception as e:
-        record(name, "FAIL", str(e), "Run: nginx -t  to see config errors")
+        step_fail(str(e), "Run: nginx -t  to see config errors")
+        raise DeploymentFailed()
 
-def step_obtain_tls(cfg):
-    name = "TLS certificate"
+def do_obtain_tls(cfg):
+    step_start("TLS certificate")
     try:
         cert_path = Path(f"/etc/letsencrypt/live/{cfg['domain']}/fullchain.pem")
         if cert_path.exists():
-            record(name, "SKIP", "Certificate already exists (certbot auto-renews)")
+            step_skip("Certificate already exists (certbot auto-renews)")
             return
-        run(f"certbot --nginx -d {cfg['domain']} --non-interactive --agree-tos -m {cfg['tls_email']}")
-        record(name, "PASS", f"Certificate obtained for {cfg['domain']}")
+        log(f"Requesting certificate for {cfg['domain']} from Let's Encrypt...")
+        run_live(f"certbot --nginx -d {cfg['domain']} --non-interactive --agree-tos -m {cfg['tls_email']}")
+        step_pass(f"Certificate obtained for {cfg['domain']}")
     except Exception as e:
-        record(name, "FAIL", str(e), "Ensure DNS A record points to this server and port 80 is open")
+        step_fail(str(e), "Ensure DNS A record points to this server and port 80 is open")
+        raise DeploymentFailed()
 
-def step_configure_firewall():
-    name = "Firewall (UFW)"
+def do_configure_firewall():
+    step_start("Firewall (UFW)")
     try:
         if not cmd_exists("ufw"):
-            run("apt-get install -y -qq ufw")
-        run("ufw default deny incoming", check=False)
-        run("ufw default allow outgoing", check=False)
-        run("ufw allow 22/tcp", check=False)
-        run("ufw allow 80/tcp", check=False)
-        run("ufw allow 443/tcp", check=False)
-        run("ufw --force enable", check=False)
-        record(name, "PASS", "UFW enabled (22, 80, 443 allowed, all else denied)")
+            log("Installing UFW...")
+            run_quiet("apt-get install -y -qq ufw")
+        run_quiet("ufw default deny incoming", check=False)
+        run_quiet("ufw default allow outgoing", check=False)
+        run_quiet("ufw allow 22/tcp", check=False)
+        run_quiet("ufw allow 80/tcp", check=False)
+        run_quiet("ufw allow 443/tcp", check=False)
+        run_quiet("ufw --force enable", check=False)
+        step_pass("UFW enabled (22, 80, 443 allowed, all else denied)")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_hardening():
-    name = "System hardening"
+def do_hardening():
+    step_start("System hardening")
     try:
         tasks = []
-
-        # fail2ban
         if not cmd_exists("fail2ban-client"):
-            run("apt-get install -y -qq fail2ban")
+            log("Installing fail2ban...")
+            run_quiet("apt-get install -y -qq fail2ban")
             tasks.append("fail2ban installed")
-        run("systemctl enable fail2ban", check=False)
-        run("systemctl start fail2ban", check=False)
+        run_quiet("systemctl enable fail2ban", check=False)
+        run_quiet("systemctl start fail2ban", check=False)
         tasks.append("fail2ban enabled")
 
-        # Unattended security upgrades
-        run("apt-get install -y -qq unattended-upgrades", check=False)
-        run("dpkg-reconfigure -f noninteractive unattended-upgrades", check=False)
+        log("Configuring unattended security upgrades...")
+        run_quiet("apt-get install -y -qq unattended-upgrades", check=False)
+        run_quiet("dpkg-reconfigure -f noninteractive unattended-upgrades", check=False)
         tasks.append("unattended-upgrades enabled")
 
-        # Postgres: ensure listening only on localhost (default on Ubuntu, but verify)
-        pg_conf = Path("/etc/postgresql")
-        if pg_conf.exists():
-            tasks.append("PostgreSQL localhost-only (Ubuntu default)")
-
-        # Root SSH and password SSH preserved per spec requirement
         tasks.append("root SSH + password SSH preserved (per spec)")
-
-        record(name, "PASS", "; ".join(tasks))
+        step_pass("; ".join(tasks))
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_configure_logrotate():
-    name = "Log rotation"
+def do_configure_logrotate():
+    step_start("Log rotation")
     try:
         logrotate_conf = """/var/log/nginx/meeting-bingo-*.log {
     daily
@@ -443,86 +512,101 @@ def step_configure_logrotate():
 }
 """
         Path("/etc/logrotate.d/meeting-bingo").write_text(logrotate_conf)
-        record(name, "PASS", "14-day rotation for Nginx logs")
+        step_pass("14-day rotation for Nginx logs")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_configure_backup(app_dir):
-    name = "Backup cron job"
+def do_configure_backup(app_dir):
+    step_start("Backup cron job")
     try:
         backup_dir = Path(app_dir) / "data" / "backups"
         backup_dir.mkdir(parents=True, exist_ok=True)
-        run(f"chown meetingbingo:meetingbingo {backup_dir}")
+        run_quiet(f"chown meetingbingo:meetingbingo {backup_dir}")
 
         script = Path(app_dir) / "infra" / "scripts" / "backup.sh"
         if script.exists():
-            run(f"chmod +x {script}")
+            run_quiet(f"chmod +x {script}")
 
         cron_path = Path("/etc/cron.d/meeting-bingo-backup")
         if cron_path.exists():
-            record(name, "SKIP", "Cron job already exists")
+            step_skip("Cron job already exists")
             return
 
         cron_line = f"0 2 * * * meetingbingo {script} >> /var/log/meeting-bingo-backup.log 2>&1\n"
         cron_path.write_text(cron_line)
-        record(name, "PASS", "Daily backup at 2am, 30-day retention")
+        step_pass("Daily backup at 2am, 30-day retention")
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
-def step_health_check(cfg):
-    name = "Health checks"
+def do_health_check(cfg):
+    step_start("Health check")
     try:
-        # Give services a moment to start
+        log("Waiting for services to start...")
         time.sleep(4)
-
-        r = run(f"curl -sf http://localhost:{cfg['api_port']}/health", check=False)
+        log(f"Checking http://localhost:{cfg['api_port']}/health ...")
+        r = run_quiet(f"curl -sf http://localhost:{cfg['api_port']}/health", check=False)
         if r.returncode == 0 and "ok" in r.stdout:
-            record(name, "PASS", "API /health returned ok")
+            log(f"Response: {r.stdout.strip()}")
+            step_pass("API /health returned ok")
         else:
-            record(name, "FAIL", f"API /health did not respond (exit {r.returncode})",
-                   "Run: journalctl -u meeting-bingo-api -n 30")
+            step_fail(
+                f"API /health did not respond (curl exit code {r.returncode})",
+                "Run: journalctl -u meeting-bingo-api -n 50"
+            )
+            raise DeploymentFailed()
+    except DeploymentFailed:
+        raise
     except Exception as e:
-        record(name, "FAIL", str(e))
+        step_fail(str(e))
+        raise DeploymentFailed()
 
 # ─── Final report ─────────────────────────────────────────────────────────────
 
-def print_report(cfg, app_dir):
+def print_report(cfg, app_dir, aborted=False):
     passed = sum(1 for r in results if r.status == "PASS")
     skipped = sum(1 for r in results if r.status == "SKIP")
     failed = sum(1 for r in results if r.status == "FAIL")
 
-    print("\n" + "=" * 72)
-    print("  DEPLOYMENT REPORT")
-    print("=" * 72)
+    print(flush=True)
+    print("=" * 72, flush=True)
+    print("  DEPLOYMENT REPORT", flush=True)
+    print("=" * 72, flush=True)
 
     for r in results:
         icon = {"PASS": "\u2713", "SKIP": "\u2013", "FAIL": "\u2717"}[r.status]
-        print(f"  {r.status:4s}  {icon}  {r.name:<30s}  {r.message}")
+        color = {"PASS": "", "SKIP": "", "FAIL": ""}[r.status]
+        print(f"  {r.status:4s}  {icon}  {r.name:<30s}  {r.message}", flush=True)
         if r.remediation:
-            print(f"         \u2192 {r.remediation}")
+            print(f"              \u2192 Fix: {r.remediation}", flush=True)
 
-    print("-" * 72)
-    print(f"  Total: {len(results)} steps | {passed} PASS | {skipped} SKIP | {failed} FAIL")
+    print("-" * 72, flush=True)
+    print(f"  Total: {len(results)} steps | {passed} PASS | {skipped} SKIP | {failed} FAIL", flush=True)
 
     if failed > 0:
-        print("\n  \u26a0  Some steps failed. Review remediation notes above.")
+        print(flush=True)
+        print("  \u2717 Deployment FAILED. The step above caused the failure.", flush=True)
+        print("    Fix the issue and rerun the script — it will skip completed steps.", flush=True)
     else:
-        print(f"\n  \u2713 Deployment successful!")
-        print(f"\n  Application:  https://{cfg['domain']}")
-        print(f"  Health check: https://{cfg['domain']}/health")
-        print(f"  Environment:  {app_dir}/.env")
-        print(f"  Exports:      {app_dir}/data/exports/")
-        print(f"  Backups:      {app_dir}/data/backups/")
-        print(f"  API logs:     journalctl -u meeting-bingo-api -f")
-        print(f"  Web logs:     journalctl -u meeting-bingo-web -f")
+        print(flush=True)
+        print(f"  \u2713 Deployment successful!", flush=True)
+        print(flush=True)
+        print(f"  Application:  https://{cfg['domain']}", flush=True)
+        print(f"  Health check: https://{cfg['domain']}/health", flush=True)
+        print(f"  Environment:  {app_dir}/.env", flush=True)
+        print(f"  Exports:      {app_dir}/data/exports/", flush=True)
+        print(f"  Backups:      {app_dir}/data/backups/", flush=True)
+        print(f"  API logs:     journalctl -u meeting-bingo-api -f", flush=True)
+        print(f"  Web logs:     journalctl -u meeting-bingo-web -f", flush=True)
 
-    print("=" * 72)
+    print("=" * 72, flush=True)
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Meeting Bingo — Zero-touch deployment for Ubuntu 24.04 LTS",
+        description="Meeting Bingo \u2014 Zero-touch deployment for Ubuntu 24.04 LTS",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -540,8 +624,6 @@ Examples:
                         help="Domain name (e.g., bingo.example.com)")
     parser.add_argument("--tls-email", required=True,
                         help="Email for Let's Encrypt certificate")
-
-    # Optional overrides — all have sensible defaults
     parser.add_argument("--app-dir", default="/opt/meeting-bingo",
                         help="Application directory (default: /opt/meeting-bingo)")
     parser.add_argument("--api-port", type=int, default=3001,
@@ -562,7 +644,6 @@ Examples:
     args = parser.parse_args()
     app_dir = args.app_dir
 
-    # Build config dict — passwords auto-generated, not user-provided
     env_path = Path(app_dir) / ".env"
     existing_env = load_existing_env(env_path)
 
@@ -575,48 +656,47 @@ Examples:
         "db_user": args.db_user,
         "db_host": args.db_host,
         "db_port": args.db_port,
-        # Auto-generate DB password, or reuse from existing .env
         "db_password": existing_env.get("DB_PASSWORD") or generate_password(),
     }
 
-    print("=" * 72)
-    print("  Meeting Bingo \u2014 Deployment")
-    print(f"  Domain:    {cfg['domain']}")
-    print(f"  App dir:   {app_dir}")
-    print(f"  DB:        {cfg['db_user']}@{cfg['db_host']}:{cfg['db_port']}/{cfg['db_name']}")
-    print(f"  Ports:     API={cfg['api_port']}, Web={cfg['web_port']}")
-    print(f"  TLS email: {cfg['tls_email']}")
-    print("=" * 72)
-    print()
+    print("=" * 72, flush=True)
+    print("  Meeting Bingo \u2014 Deployment", flush=True)
+    print(f"  Domain:    {cfg['domain']}", flush=True)
+    print(f"  App dir:   {app_dir}", flush=True)
+    print(f"  DB:        {cfg['db_user']}@{cfg['db_host']}:{cfg['db_port']}/{cfg['db_name']}", flush=True)
+    print(f"  Ports:     API={cfg['api_port']}, Web={cfg['web_port']}", flush=True)
+    print(f"  TLS email: {cfg['tls_email']}", flush=True)
+    print("=" * 72, flush=True)
 
-    # ── Execute steps ──
-    step_validate_os()
-    step_install_packages()
-    step_install_node()
-    step_install_postgres()
-    step_create_database(cfg)
-    step_install_nginx()
-    step_install_certbot()
-    step_create_service_user()
-    step_create_app_dirs(app_dir)
-    step_create_env_file(app_dir, cfg, args.force_env)
-    step_install_app_deps(app_dir)
-    step_build_app(app_dir)
-    step_set_app_permissions(app_dir)
-    step_run_migrations(app_dir, cfg)
-    step_configure_systemd(app_dir)
-    step_configure_nginx(app_dir, cfg)
-    step_obtain_tls(cfg)
-    step_configure_firewall()
-    step_hardening()
-    step_configure_logrotate()
-    step_configure_backup(app_dir)
-    step_health_check(cfg)
+    try:
+        do_validate_os()
+        do_install_packages()
+        do_install_node()
+        do_install_postgres()
+        do_create_database(cfg)
+        do_install_nginx()
+        do_install_certbot()
+        do_create_service_user()
+        do_create_app_dirs(app_dir)
+        do_create_env_file(app_dir, cfg, args.force_env)
+        do_install_app_deps(app_dir)
+        do_build_app(app_dir)
+        do_set_permissions(app_dir)
+        do_run_migrations(app_dir, cfg)
+        do_configure_systemd(app_dir)
+        do_configure_nginx(app_dir, cfg)
+        do_obtain_tls(cfg)
+        do_configure_firewall()
+        do_hardening()
+        do_configure_logrotate()
+        do_configure_backup(app_dir)
+        do_health_check(cfg)
+    except DeploymentFailed:
+        print_report(cfg, app_dir, aborted=True)
+        sys.exit(1)
 
     print_report(cfg, app_dir)
-
-    failed = sum(1 for r in results if r.status == "FAIL")
-    sys.exit(1 if failed > 0 else 0)
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()
