@@ -455,7 +455,11 @@ export default function PlayPage() {
         {/* Bingo Card */}
         <div className="flex-1">
           <div className="mb-4 flex items-center justify-between">
-            <Link href={`/meetings/${meetingId}/game`} className="text-sm text-blue-600 hover:underline">&larr; Game Control</Link>
+            {isOwner ? (
+              <Link href={`/meetings/${meetingId}/game`} className="text-sm text-blue-600 hover:underline">&larr; Game Control</Link>
+            ) : (
+              <Link href={`/meetings/${meetingId}`} className="text-sm text-blue-600 hover:underline">&larr; Meeting</Link>
+            )}
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <span className={`w-2 h-2 rounded-full ${
