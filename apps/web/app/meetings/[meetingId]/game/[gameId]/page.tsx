@@ -170,9 +170,9 @@ export default function PlayPage() {
     );
   });
 
-  // Listen for participant revocation
-  useSocketEvent<{ user_id: string }>('participant.revoked', (data) => {
-    if (data.user_id === user?.id) {
+  // Listen for participant revocation (emitToUser targets us directly)
+  useSocketEvent<{ meeting_id: string }>('participant.revoked', (data) => {
+    if (data.meeting_id === meetingId) {
       setKicked(true);
     }
   });
@@ -298,15 +298,25 @@ export default function PlayPage() {
     }
   }
 
+  async function handleKick(targetUserId: string) {
+    try {
+      await api.post(`/meetings/${meetingId}/participants/${targetUserId}/revoke`);
+    } catch {
+      // Kick may fail if already revoked
+    }
+  }
+
   if (kicked) {
     return (
       <main className="flex min-h-screen items-center justify-center">
-        <div className="text-center max-w-md p-8">
-          <h1 className="text-2xl font-bold mb-4">Removed from Meeting</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            You have been removed from this meeting by the owner.
+        <div className="fixed inset-0 bg-black/50 z-40" />
+        <div className="relative z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm mx-auto p-8 text-center">
+          <div className="text-5xl mb-4">👋</div>
+          <h1 className="text-2xl font-bold mb-2">lol you got kicked</h1>
+          <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">
+            The meeting owner removed you. Better luck next time!
           </p>
-          <Link href="/dashboard" className="rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700">
+          <Link href="/dashboard" className="inline-block rounded bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700">
             Back to Dashboard
           </Link>
         </div>
@@ -518,11 +528,26 @@ export default function PlayPage() {
                       ${r.marks_until_win === 0 ? 'font-bold text-yellow-700 dark:text-yellow-400' : ''}
                     `}
                   >
-                    <span className="font-semibold">#{r.rank}</span>{' '}
-                    <span>{r.nickname}</span>
-                    <span className="float-right text-gray-500 dark:text-gray-400">
-                      {r.marks_until_win === 0 ? 'BINGO!' : `${r.marks_until_win} to go`}
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-semibold">#{r.rank}</span>{' '}
+                        <span>{r.nickname}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          {r.marks_until_win === 0 ? 'BINGO!' : `${r.marks_until_win} to go`}
+                        </span>
+                        {isOwner && r.user_id !== user?.id && (
+                          <button
+                            onClick={() => handleKick(r.user_id)}
+                            className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-[10px] font-medium ml-1"
+                            title={`Kick ${r.nickname}`}
+                          >
+                            Kick
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>
