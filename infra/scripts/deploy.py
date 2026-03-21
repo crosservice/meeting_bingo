@@ -351,11 +351,26 @@ def do_build_app(app_dir):
     step_start("App build (pnpm build)")
     try:
         log("Building shared packages, NestJS API, and Next.js frontend...")
-        # Source .env so NEXT_PUBLIC_* vars are available at build time.
-        # Next.js inlines NEXT_PUBLIC_* into the client bundle during build,
-        # so these must be in the process environment, not just in .env files.
-        run_live(f"cd {app_dir} && set -a && . .env && set +a && pnpm run build")
+        # Next.js inlines NEXT_PUBLIC_* into the client bundle at build time.
+        # We read .env via Python (handles special chars safely) and inject
+        # NEXT_PUBLIC_* vars into the subprocess environment.
+        env_vars = load_existing_env(Path(app_dir) / ".env")
+        build_env = os.environ.copy()
+        for key, value in env_vars.items():
+            if key.startswith("NEXT_PUBLIC_"):
+                build_env[key] = value
+                log(f"  {key}={value}")
+        result = subprocess.run(
+            f"cd {app_dir} && pnpm run build",
+            shell=True, stdout=sys.stdout, stderr=sys.stderr, text=True,
+            env=build_env,
+        )
+        if result.returncode != 0:
+            raise subprocess.CalledProcessError(result.returncode, "pnpm run build")
         step_pass("Frontend and backend built")
+    except subprocess.CalledProcessError as e:
+        step_fail(str(e), "Check build output above for TypeScript errors")
+        raise DeploymentFailed()
     except Exception as e:
         step_fail(str(e), "Check build output above for TypeScript errors")
         raise DeploymentFailed()
