@@ -3,15 +3,18 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Res,
   Req,
   HttpCode,
   HttpStatus,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
+import * as argon2 from 'argon2';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users';
 import { CurrentUser, Public, AuthenticatedUser } from './auth.decorators';
@@ -128,6 +131,60 @@ export class AuthController {
     }
     const fullUser = await this.usersService.findById(user.id);
     return { user: fullUser };
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ short: { ttl: 60000, limit: 5 } })
+  async changePassword(
+    @Body() body: { current_password?: string; new_password?: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (!body.current_password || !body.new_password) {
+      throw new BadRequestException('current_password and new_password are required');
+    }
+
+    if (body.new_password.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters');
+    }
+
+    const userRow = await this.usersService.findByIdWithHash(user.id);
+    if (!userRow) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const valid = await argon2.verify(userRow.password_hash, body.current_password);
+    if (!valid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const newHash = await argon2.hash(body.new_password, {
+      type: argon2.argon2id,
+      memoryCost: 65536,
+      timeCost: 3,
+      parallelism: 4,
+    });
+
+    await this.usersService.updatePassword(user.id, newHash);
+
+    return { message: 'Password changed successfully' };
+  }
+
+  @Delete('me')
+  @HttpCode(HttpStatus.OK)
+  @SkipThrottle()
+  async deleteMe(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.usersService.softDelete(user.id);
+    await this.authService.revokeAllSessions(user.id);
+
+    res.clearCookie('access_token', COOKIE_OPTIONS);
+    res.clearCookie('refresh_token', COOKIE_OPTIONS);
+
+    return { message: 'Account deleted' };
   }
 
   private setTokenCookies(

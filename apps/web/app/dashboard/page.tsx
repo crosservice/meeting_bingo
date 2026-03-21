@@ -102,16 +102,23 @@ export default function DashboardPage() {
           <div className="flex gap-3">
             <button
               onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="rounded bg-gray-200 dark:bg-gray-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
+              className="rounded bg-gray-200 dark:bg-gray-700 px-2 py-2 text-lg leading-none hover:bg-gray-300 dark:hover:bg-gray-600"
               title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
             >
-              {theme === 'light' ? 'Dark' : 'Light'}
+              {theme === 'light' ? '☀️' : '🌙'}
             </button>
             <Link
               href="/meetings/new"
               className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
               New Meeting
+            </Link>
+            <Link
+              href="/account"
+              className="rounded bg-gray-200 dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
+            >
+              Account
             </Link>
             <button
               onClick={logout}

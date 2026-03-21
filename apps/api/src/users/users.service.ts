@@ -46,4 +46,16 @@ export class UsersService {
   async updateTheme(id: string, theme: string): Promise<void> {
     await this.repo.updateTheme(id, theme);
   }
+
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    await this.repo.updatePassword(id, passwordHash);
+  }
+
+  async softDelete(id: string): Promise<void> {
+    await this.repo.softDelete(id);
+  }
+
+  async findByIdWithHash(id: string): Promise<import('./users.repository').UserRow | null> {
+    return this.repo.findById(id);
+  }
 }

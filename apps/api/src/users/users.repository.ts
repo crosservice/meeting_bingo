@@ -57,4 +57,18 @@ export class UsersRepository {
       [id, theme],
     );
   }
+
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    await this.pool.query(
+      'UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1',
+      [id, passwordHash],
+    );
+  }
+
+  async softDelete(id: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE users SET deleted_at = NOW(), status = 'deleted', updated_at = NOW() WHERE id = $1",
+      [id],
+    );
+  }
 }
