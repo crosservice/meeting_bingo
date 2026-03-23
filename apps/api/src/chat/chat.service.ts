@@ -87,14 +87,18 @@ export class ChatService {
 
     const message = await this.repo.create(meetingId, gameId ?? null, userId, nickname, trimmed);
 
-    // Broadcast to meeting room (anonymized if enabled)
-    if (meeting.anonymize_nicknames) {
-      const anonResponse = toMessageResponse(message, anonymizeNickname(meetingId, userId));
-      this.wsGateway.emitToMeeting(meetingId, ServerEvents.ChatCreated, anonResponse);
-      // Owner gets real nickname
-      this.wsGateway.emitToUser(meeting.owner_user_id, ServerEvents.ChatCreated, toMessageResponse(message));
-    } else {
-      this.wsGateway.emitToMeeting(meetingId, ServerEvents.ChatCreated, toMessageResponse(message));
+    // Broadcast to meeting room (best-effort — message is already persisted)
+    try {
+      if (meeting.anonymize_nicknames) {
+        const anonResponse = toMessageResponse(message, anonymizeNickname(meetingId, userId));
+        this.wsGateway.emitToMeeting(meetingId, ServerEvents.ChatCreated, anonResponse);
+        // Owner gets real nickname
+        this.wsGateway.emitToUser(meeting.owner_user_id, ServerEvents.ChatCreated, toMessageResponse(message));
+      } else {
+        this.wsGateway.emitToMeeting(meetingId, ServerEvents.ChatCreated, toMessageResponse(message));
+      }
+    } catch {
+      // WS emit is best-effort; message is already saved
     }
 
     const response = toMessageResponse(message);
@@ -114,10 +118,14 @@ export class ChatService {
 
     const response = toMessageResponse(hidden);
 
-    // Broadcast hide event
-    this.wsGateway.emitToMeeting(message.meeting_id, ServerEvents.ChatHidden, {
-      message_id: messageId,
-    });
+    // Broadcast hide event (best-effort)
+    try {
+      this.wsGateway.emitToMeeting(message.meeting_id, ServerEvents.ChatHidden, {
+        message_id: messageId,
+      });
+    } catch {
+      // WS emit is best-effort
+    }
 
     return response;
   }

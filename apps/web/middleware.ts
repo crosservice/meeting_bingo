@@ -26,9 +26,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for access token cookie
+  // Check for access token cookie (or refresh token — the client-side
+  // API layer will transparently refresh an expired access token).
   const accessToken = request.cookies.get('access_token');
-  if (!accessToken) {
+  const refreshToken = request.cookies.get('refresh_token');
+  if (!accessToken && !refreshToken) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
