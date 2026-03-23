@@ -124,6 +124,14 @@ export default function DashboardPage() {
             >
               New Meeting
             </Link>
+            {user.role === 'superuser' && (
+              <Link
+                href="/admin"
+                className="rounded bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+              >
+                Admin
+              </Link>
+            )}
             <Link
               href="/account"
               className="rounded bg-gray-200 dark:bg-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"

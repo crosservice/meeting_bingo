@@ -6,6 +6,7 @@ import { api, ApiError } from './api';
 interface User {
   id: string;
   nickname: string;
+  role?: string;
   theme?: 'light' | 'dark';
 }
 

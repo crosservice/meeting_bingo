@@ -15,6 +15,7 @@ import { GameplayModule } from './gameplay';
 import { ChatModule } from './chat';
 import { ExportsModule } from './exports';
 import { WsModule } from './websocket';
+import { AdminModule } from './admin';
 import { HealthController } from './health/health.controller';
 
 @Module({
@@ -45,6 +46,7 @@ import { HealthController } from './health/health.controller';
     ChatModule,
     ExportsModule,
     WsModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [

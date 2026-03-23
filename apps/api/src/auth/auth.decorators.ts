@@ -4,6 +4,7 @@ import { IS_PUBLIC_KEY } from './auth.guard';
 export interface AuthenticatedUser {
   id: string;
   nickname: string;
+  role: string;
 }
 
 export const CurrentUser = createParamDecorator(

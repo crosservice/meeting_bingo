@@ -7,10 +7,12 @@ export interface UserRow {
   nickname: string;
   password_hash: string;
   status: string;
+  role: string;
   theme: string;
   created_at: Date;
   updated_at: Date;
   last_login_at: Date | null;
+  last_login_ip: string | null;
   deleted_at: Date | null;
 }
 
@@ -44,10 +46,10 @@ export class UsersRepository {
     return rows[0];
   }
 
-  async updateLastLogin(id: string): Promise<void> {
+  async updateLastLogin(id: string, ip?: string): Promise<void> {
     await this.pool.query(
-      'UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1',
-      [id],
+      'UPDATE users SET last_login_at = NOW(), last_login_ip = COALESCE($2, last_login_ip), updated_at = NOW() WHERE id = $1',
+      [id, ip ?? null],
     );
   }
 

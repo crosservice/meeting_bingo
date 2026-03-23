@@ -56,6 +56,7 @@ export class AuthController {
   @Throttle({ short: { ttl: 60000, limit: 5 } })
   async login(
     @Body() body: unknown,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const parsed = loginSchema.safeParse(body);
@@ -63,9 +64,12 @@ export class AuthController {
       throw new BadRequestException(parsed.error.flatten().fieldErrors);
     }
 
+    const ip = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.ip;
+
     const { user, tokens } = await this.authService.login(
       parsed.data.nickname,
       parsed.data.password,
+      ip,
     );
 
     this.setTokenCookies(res, tokens.accessToken, tokens.refreshToken);

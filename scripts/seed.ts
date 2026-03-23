@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import * as argon2 from 'argon2';
 
 const DATABASE_URL =
   process.env.DATABASE_URL || 'postgresql://meeting_bingo:changeme@localhost:5432/meeting_bingo';
@@ -117,6 +118,28 @@ async function main() {
         [meeting.id],
       );
       console.log('Created default ruleset');
+
+      // Create superuser account (password: "ChangeMePlease99@")
+      const superuserPassword = await argon2.hash('ChangeMePlease99@', {
+        type: argon2.argon2id,
+        memoryCost: 65536,
+        timeCost: 3,
+        parallelism: 4,
+      });
+      const {
+        rows: [superuser],
+      } = await client.query(
+        `INSERT INTO users (nickname, password_hash, status, role)
+         VALUES ($1, $2, 'active', 'superuser')
+         ON CONFLICT DO NOTHING
+         RETURNING id, nickname`,
+        ['SuperUser', superuserPassword],
+      );
+      if (superuser) {
+        console.log(`Created superuser: ${superuser.nickname} (${superuser.id})`);
+      } else {
+        console.log('Superuser already exists. Skipping.');
+      }
 
       await client.query('COMMIT');
       console.log('\nSeed completed successfully.');

@@ -18,6 +18,7 @@ interface TokenPair {
 interface JwtPayload {
   sub: string;
   nickname: string;
+  role: string;
 }
 
 @Injectable()
@@ -55,7 +56,7 @@ export class AuthService {
     return user;
   }
 
-  async login(nickname: string, password: string): Promise<{ user: typeof user; tokens: TokenPair }> {
+  async login(nickname: string, password: string, ip?: string): Promise<{ user: typeof user; tokens: TokenPair }> {
     // Generic error to prevent user enumeration
     const genericError = new UnauthorizedException('Invalid nickname or password');
 
@@ -66,17 +67,23 @@ export class AuthService {
       throw genericError;
     }
 
+    if (userRow.status === 'suspended') {
+      await this.logAudit(userRow.id, 'user', userRow.id, 'login_failed');
+      throw new UnauthorizedException('Account is suspended');
+    }
+
     const valid = await argon2.verify(userRow.password_hash, password);
     if (!valid) {
       await this.logAudit(userRow.id, 'user', userRow.id, 'login_failed');
       throw genericError;
     }
 
-    await this.usersService.updateLastLogin(userRow.id);
+    await this.usersService.updateLastLogin(userRow.id, ip);
 
     const tokens = await this.generateTokens({
       sub: userRow.id,
       nickname: userRow.nickname,
+      role: userRow.role || 'user',
     });
 
     await this.storeRefreshToken(userRow.id, tokens.refreshToken);
@@ -117,6 +124,7 @@ export class AuthService {
     const tokens = await this.generateTokens({
       sub: user.id,
       nickname: user.nickname,
+      role: user.role || 'user',
     });
 
     await this.storeRefreshToken(user.id, tokens.refreshToken);
