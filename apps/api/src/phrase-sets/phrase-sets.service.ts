@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
 import { PhraseSetsRepository, PhraseSetRow, PhraseRow } from './phrase-sets.repository';
 import { MeetingsService } from '../meetings';
@@ -142,6 +141,15 @@ export class PhraseSetsService {
     await this.meetingsService.assertOwner(set.meeting_id, userId);
 
     await this.repo.softDeletePhrase(phraseId);
+  }
+
+  async listMyPhraseSets(userId: string, excludeMeetingId?: string) {
+    const sets = await this.repo.findSetsByCreator(userId, excludeMeetingId);
+    return sets.map((row) => ({
+      ...toSetResponse(row),
+      meeting_name: row.meeting_name,
+      phrase_count: row.phrase_count,
+    }));
   }
 
   async getActivePhrases(setId: string): Promise<PhraseRow[]> {

@@ -8,6 +8,7 @@ import ThemeToggle from '@/components/theme-toggle';
 
 interface PhraseSet { id: string; name: string; }
 interface Phrase { id: string; text: string; normalized_text: string; is_active: boolean; }
+interface MyPhraseSet { id: string; name: string; meeting_name: string; phrase_count: number; }
 
 export default function PhrasesPage() {
   const { meetingId } = useParams() as { meetingId: string };
@@ -19,11 +20,10 @@ export default function PhrasesPage() {
   const [bulkPhrases, setBulkPhrases] = useState('');
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkResult, setBulkResult] = useState('');
-  const [importMeetingId, setImportMeetingId] = useState('');
-  const [importSets, setImportSets] = useState<PhraseSet[]>([]);
-  const [importSelectedSetId, setImportSelectedSetId] = useState('');
-  const [importingFromMeeting, setImportingFromMeeting] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
+  const [myPhraseSets, setMyPhraseSets] = useState<MyPhraseSet[]>([]);
+  const [reuseSelectedSetId, setReuseSelectedSetId] = useState('');
+  const [reuseImporting, setReuseImporting] = useState(false);
+  const [showReusePanel, setShowReusePanel] = useState(false);
   const [warning, setWarning] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -88,30 +88,27 @@ export default function PhrasesPage() {
     setBulkImporting(false);
   }
 
-  async function handleLoadImportSets() {
-    if (!importMeetingId.trim()) return;
-    setImportingFromMeeting(true);
+  async function handleOpenReusePanel() {
+    setShowReusePanel(true);
+    setWarning('');
     try {
-      const res = await api.get<{ phrase_sets: PhraseSet[] }>(`/meetings/${importMeetingId.trim()}/phrase-sets`);
-      setImportSets(res.phrase_sets);
-      if (res.phrase_sets.length > 0) setImportSelectedSetId(res.phrase_sets[0].id);
-      else setWarning('No phrase sets found in that meeting.');
+      const res = await api.get<{ phrase_sets: MyPhraseSet[] }>(`/me/phrase-sets?exclude_meeting=${meetingId}`);
+      setMyPhraseSets(res.phrase_sets);
+      if (res.phrase_sets.length > 0) setReuseSelectedSetId(res.phrase_sets[0].id);
+      else setWarning('No phrase sets from other meetings found.');
     } catch {
-      setWarning('Failed to load phrase sets from that meeting. Check the meeting ID.');
-      setImportSets([]);
-    } finally {
-      setImportingFromMeeting(false);
+      setWarning('Failed to load your phrase sets.');
     }
   }
 
-  async function handleImportFromMeeting() {
-    if (!activeSetId || !importSelectedSetId) return;
-    setImportingFromMeeting(true);
+  async function handleReuseImport() {
+    if (!activeSetId || !reuseSelectedSetId) return;
+    setReuseImporting(true);
     setBulkResult('');
     setWarning('');
 
     try {
-      const res = await api.get<{ phrases: Phrase[] }>(`/phrase-sets/${importSelectedSetId}/phrases`);
+      const res = await api.get<{ phrases: Phrase[] }>(`/phrase-sets/${reuseSelectedSetId}/phrases`);
       let imported = 0;
       const warnings: string[] = [];
 
@@ -129,13 +126,11 @@ export default function PhrasesPage() {
 
       setBulkResult(`Imported ${imported} phrases from the selected set.`);
       if (warnings.length > 0) setWarning(warnings.join(' | '));
-      setShowImportModal(false);
-      setImportMeetingId('');
-      setImportSets([]);
+      setShowReusePanel(false);
     } catch {
       setWarning('Failed to import phrases.');
     } finally {
-      setImportingFromMeeting(false);
+      setReuseImporting(false);
     }
   }
 
@@ -207,55 +202,44 @@ export default function PhrasesPage() {
                   {bulkImporting ? 'Importing...' : 'Import'}
                 </button>
                 <button
-                  onClick={() => setShowImportModal(!showImportModal)}
+                  onClick={handleOpenReusePanel}
                   className="rounded bg-gray-200 dark:bg-gray-700 dark:text-gray-200 px-4 py-1.5 text-sm hover:bg-gray-300 dark:hover:bg-gray-600"
                 >
-                  Import from Meeting
+                  Reuse My Phrase Set
                 </button>
               </div>
             </div>
 
             {bulkResult && <div className="mb-3 rounded bg-green-50 dark:bg-green-900/30 p-2 text-sm text-green-700 dark:text-green-300">{bulkResult}</div>}
 
-            {/* Import from another meeting */}
-            {showImportModal && (
+            {/* Reuse phrase set from another meeting */}
+            {showReusePanel && (
               <div className="mb-4 rounded border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-                <h3 className="text-sm font-semibold">Import from Another Meeting</h3>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={importMeetingId}
-                    onChange={(e) => setImportMeetingId(e.target.value)}
-                    placeholder="Meeting ID"
-                    className="flex-1 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 px-3 py-1.5 text-sm"
-                  />
-                  <button
-                    onClick={handleLoadImportSets}
-                    disabled={importingFromMeeting || !importMeetingId.trim()}
-                    className="rounded bg-blue-600 px-4 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Load Sets
-                  </button>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Reuse My Phrase Set</h3>
+                  <button onClick={() => setShowReusePanel(false)} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">Close</button>
                 </div>
-                {importSets.length > 0 && (
+                {myPhraseSets.length > 0 ? (
                   <div className="space-y-2">
                     <select
-                      value={importSelectedSetId}
-                      onChange={(e) => setImportSelectedSetId(e.target.value)}
+                      value={reuseSelectedSetId}
+                      onChange={(e) => setReuseSelectedSetId(e.target.value)}
                       className="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 px-2 py-1.5 text-sm"
                     >
-                      {importSets.map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                      {myPhraseSets.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.meeting_name}) — {s.phrase_count} phrases</option>
                       ))}
                     </select>
                     <button
-                      onClick={handleImportFromMeeting}
-                      disabled={importingFromMeeting || !importSelectedSetId}
+                      onClick={handleReuseImport}
+                      disabled={reuseImporting || !reuseSelectedSetId}
                       className="rounded bg-green-600 px-4 py-1.5 text-sm text-white hover:bg-green-700 disabled:opacity-50"
                     >
-                      {importingFromMeeting ? 'Importing...' : 'Import Phrases'}
+                      {reuseImporting ? 'Importing...' : 'Import Phrases'}
                     </button>
                   </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No phrase sets from other meetings found.</p>
                 )}
               </div>
             )}

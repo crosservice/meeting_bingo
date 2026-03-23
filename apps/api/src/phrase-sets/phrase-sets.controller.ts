@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   HttpCode,
   HttpStatus,
   BadRequestException,
@@ -17,6 +18,15 @@ import { createPhraseSetSchema, createPhraseSchema, updatePhraseSchema } from '@
 @Controller()
 export class PhraseSetsController {
   constructor(private readonly service: PhraseSetsService) {}
+
+  @Get('me/phrase-sets')
+  async listMyPhraseSets(
+    @Query('exclude_meeting') excludeMeetingId: string | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const phraseSets = await this.service.listMyPhraseSets(user.id, excludeMeetingId);
+    return { phrase_sets: phraseSets };
+  }
 
   // Phrase Sets
   @Post('meetings/:meetingId/phrase-sets')

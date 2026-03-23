@@ -122,6 +122,25 @@ export class PhraseSetsRepository {
     await this.pool.query('UPDATE phrases SET deleted_at = NOW() WHERE id = $1', [id]);
   }
 
+  async findSetsByCreator(userId: string, excludeMeetingId?: string): Promise<(PhraseSetRow & { meeting_name: string; phrase_count: number })[]> {
+    const query = excludeMeetingId
+      ? `SELECT ps.*, m.name AS meeting_name,
+           (SELECT COUNT(*)::int FROM phrases p WHERE p.phrase_set_id = ps.id AND p.deleted_at IS NULL AND p.is_active = true) AS phrase_count
+         FROM phrase_sets ps
+         JOIN meetings m ON m.id = ps.meeting_id
+         WHERE ps.created_by_user_id = $1 AND ps.deleted_at IS NULL AND ps.meeting_id != $2
+         ORDER BY ps.created_at DESC`
+      : `SELECT ps.*, m.name AS meeting_name,
+           (SELECT COUNT(*)::int FROM phrases p WHERE p.phrase_set_id = ps.id AND p.deleted_at IS NULL AND p.is_active = true) AS phrase_count
+         FROM phrase_sets ps
+         JOIN meetings m ON m.id = ps.meeting_id
+         WHERE ps.created_by_user_id = $1 AND ps.deleted_at IS NULL
+         ORDER BY ps.created_at DESC`;
+    const params = excludeMeetingId ? [userId, excludeMeetingId] : [userId];
+    const { rows } = await this.pool.query(query, params);
+    return rows;
+  }
+
   async findDuplicates(setId: string, normalizedText: string, excludeId?: string): Promise<PhraseRow[]> {
     const query = excludeId
       ? 'SELECT * FROM phrases WHERE phrase_set_id = $1 AND normalized_text = $2 AND deleted_at IS NULL AND is_active = true AND id != $3'
